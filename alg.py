@@ -8,7 +8,7 @@ class MarketSplit:
         self.A = A
         self.d = d
         self.m, self.n = A.shape
-        self.self.n_basis = self.n - self.m + 1
+        self.n_basis = self.n - self.m + 1
         self.r = r if r else np.ones(self.n, dtype=int)
 
         self.rmax = None
@@ -17,6 +17,12 @@ class MarketSplit:
         self.b_hat = None  # Store as row vector
         self.b_bar = None  # Store as row vector
         self.mu = None
+
+        # Run preprocessing
+        self._get_extended_matrix()
+        self._get_reduced_basis()
+        self._get_gso()
+        self._compute_dual_norms()
     
     def _compute_lcm(self, nums):
         def __lcm(a, b):
@@ -104,4 +110,4 @@ class MarketSplit:
             'l1': np.array([np.linalg.norm(self.b_bar[i, :], ord=1) for i in range(self.n_basis)])
         }
     
-    
+
