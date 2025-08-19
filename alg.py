@@ -33,7 +33,7 @@ class MarketSplit:
             return abs(a * b) // gcd(a, b)
         return reduce(__lcm, nums)
     
-   def _get_extended_matrix(self, N=None):
+    def _get_extended_matrix(self, N=None):
         if N is None:
             pows = len(str(np.max(np.abs(self.A)))) + len(str(np.max(np.abs(self.d)))) + 2
             N = 10 ** pows
@@ -55,7 +55,7 @@ class MarketSplit:
             self.L[self.m + i, 1 + i] = 2 * self.c[i]
         
 
-   def _get_reduced_basis(self):
+    def _get_reduced_basis(self):
         ext_m, ext_n = self.L.shape
         L_lll = IntegerMatrix.from_matrix(self.L.T.tolist())
         LLL.reduction(L_lll)
