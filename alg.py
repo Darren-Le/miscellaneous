@@ -27,6 +27,7 @@ class MarketSplit:
         self._get_reduced_basis()
         self._get_gso()
         self._compute_dual_norms()
+        self._get_coordinates()
     
     def _compute_lcm(self, nums):
         def __lcm(a, b):
