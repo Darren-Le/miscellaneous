@@ -18,6 +18,10 @@ class MarketSplit:
         self.b_bar = None  # Store as row vector
         self.mu = None
 
+        # coords[i] is the coordinates of basis[i]: self.L @ coords[i].T = basis[i].T
+        # it is a solution of the homogenous system: (A, -d) @ coords[i].T = 0
+        self.coords = None 
+
         # Run preprocessing
         self._get_extended_matrix()
         self._get_reduced_basis()
@@ -110,4 +114,11 @@ class MarketSplit:
             'l1': np.array([np.linalg.norm(self.b_bar[i, :], ord=1) for i in range(self.n_basis)])
         }
     
+    def _get_coordinates(self):
+        L_bottom = self.L[self.m:, :]
+        coordinates = []
+        for i in range(self.n_basis):
+            x = np.linalg.solve(L_bottom, self.basis[i, :])
+            coordinates.append(x)
+        self.coords = np.array(coordinates)
 
