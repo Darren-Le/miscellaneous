@@ -123,3 +123,9 @@ class MarketSplit:
             coordinates.append(x)
         self.coords = np.array(coordinates)
 
+A = np.array([[1,4]], dtype=int)
+d = np.array([4], dtype=int)
+ms = MarketSplit(A, d)
+print(ms.L)
+print(ms.basis)
+print(ms.coords)
