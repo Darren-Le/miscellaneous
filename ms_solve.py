@@ -126,7 +126,8 @@ class MarketSplit:
 
     def enumerate(self):
         sols = []
-        
+        c = (self.n + 1) * self.rmax ** 2  # 预计算常数
+
         def backtrack(idx, u_values, prev_w):
             """
             回溯算法
@@ -156,26 +157,33 @@ class MarketSplit:
                             sols.append(x.copy())
                 return
             
-            # 枚举 u[idx]
-            u_range = 100  # TODO: 使用剪枝条件
+        # 第一个剪枝条件：检查 ||w^(idx+1)||_2^2 是否已经超过界限
+        prev_w_norm_sq = np.dot(prev_w, prev_w)
+        if prev_w_norm_sq > c:
+            return  # 剪枝
+        
+        # 计算 sum_{i=idx+1}^{n_basis-1} u_i * mu_{i,idx}
+        mu_sum = 0.0
+        for j in range(idx + 1, self.n_basis):
+            mu_sum += u_values[j] * self.mu[j, idx]
+        
+        # 根据第一个剪枝条件计算 u[idx] 的范围
+        # (u_idx + mu_sum)^2 <= (c - ||w^(idx+1)||_2^2) / ||b_hat^(idx)||_2^2
+        bound_sq = (c - prev_w_norm_sq) / self.b_hat_norms_sq[idx]
+        bound = np.sqrt(max(0, bound_sq))
+        
+        # u_idx 的范围是: -bound - mu_sum <= u_idx <= bound - mu_sum
+        u_min = int(np.floor(-bound - mu_sum))
+        u_max = int(np.ceil(bound - mu_sum))
+        
+        for u_val in range(u_min, u_max + 1):
+            u_values[idx] = u_val
             
-            for u_val in range(-u_range, u_range + 1):
-                u_values[idx] = u_val
-                
-                # 计算 w^(idx)
-                coeff = u_val
-                for j in range(idx + 1, self.n_basis):
-                    coeff += u_values[j] * self.mu[j, idx]
-                
-                curr_w = coeff * self.b_hat[idx] + prev_w
-                
-                backtrack(idx - 1, u_values, curr_w)
-        
-        # 初始化
-        u_initial = np.zeros(self.n_basis, dtype=int)
-        w_initial = np.zeros(self.n + 1)
-        
-        backtrack(self.n_basis - 1, u_initial, w_initial)
+            # 计算 w^(idx) = (u_val + mu_sum) * b_hat[idx] + prev_w
+            coeff = u_val + mu_sum
+            curr_w = coeff * self.b_hat[idx] + prev_w
+            
+            backtrack(idx - 1, u_values, curr_w)
         
         return sols
 
