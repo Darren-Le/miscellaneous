@@ -2,6 +2,7 @@ import numpy as np
 from fpylll import IntegerMatrix, LLL, GSO
 from math import gcd
 from functools import reduce
+from ms_data import MSData
 
 class MarketSplit:
     def __init__(self, A, d, r=None):
@@ -178,9 +179,37 @@ class MarketSplit:
         
         return sols
 
-A = np.array([[1,4]], dtype=int)
-d = np.array([4], dtype=int)
-ms = MarketSplit(A, d)
-print(ms.L)
-print(ms.basis)
-print(ms.coords)
+# 主函数部分 - 使用数据文件
+if __name__ == "__main__":
+    # 1. 加载数据
+    data_path = "path/to/data"  # 替换为你的数据文件夹路径
+    ms_data = MSData(data_path)
+    
+    # 2. 获取特定实例
+    instance_id = "ms_03_050_002"
+    inst = ms_data.get(instance_id)
+    
+    # 3. 提取A和d矩阵
+    A = inst['A']
+    d = inst['d']
+    
+    print(f"Loaded instance {instance_id}:")
+    print(f"  Matrix A shape: {A.shape}")
+    print(f"  Vector d shape: {d.shape}")
+    print(f"  A = \n{A}")
+    print(f"  d = {d}")
+    
+    # 4. 创建MarketSplit实例并求解
+    try:
+        ms = MarketSplit(A, d)
+        print(f"\nExtended matrix L shape: {ms.L.shape}")
+        print(f"Basis shape: {ms.basis.shape}")
+        print(f"Coordinates shape: {ms.coords.shape}")
+        
+        # 可选：运行枚举算法
+        # print("\nRunning enumeration...")
+        # solutions = ms.enumerate()
+        # print(f"Found {len(solutions)} solutions")
+        
+    except Exception as e:
+        print(f"Error creating MarketSplit instance: {e}")
