@@ -130,50 +130,50 @@ class MarketSplit:
             """
             回溯算法
             idx: 当前要确定的 u 的索引 (从 n_basis-1 递减到 0)
-            u_values: 长度为 n_basis 的数组，存储 u_0 到 u_{n_basis-1} 的值
-            prev_w: w^(idx+1) - 上一层的投影向量
+            u_values: 长度为 n_basis 的数组
+            prev_w: w^(idx+1)
             """
             if idx == -1:
-                # 所有 u_i 都已确定，构建解向量 v = sum(u_i * basis_i)
+                # 计算 v = sum(u_i * basis_i)
                 v = np.zeros(self.n + 1)
                 for i in range(self.n_basis):
                     v += u_values[i] * self.basis[i]
                 
-                # 检查是否满足约束: v_0 = rmax 且 -rmax <= v_i <= rmax for all i
-                if abs(v[0] - self.rmax) < 1e-10:  # v_0 应该等于 rmax
-                    if np.all(v >= -self.rmax - 1e-10) and np.all(v <= self.rmax + 1e-10):
-                        # 转为整数解
-                        v_int = np.round(v).astype(int)
-                        # 从 v 恢复原始解 x
-                        x = v_int[1:] // (2 * self.c) + self.r // 2
+                # 检查约束: v[-1] = rmax 且 -rmax <= v[i] <= rmax for i = 0, ..., n-1
+                if abs(v[-1] - self.rmax) < 1e-10:  # v0 = rmax => x0 = 1
+                    if np.all(v[:-1] >= -self.rmax - 1e-10) and np.all(v[:-1] <= self.rmax + 1e-10):
+                        # 由于矩阵M的特殊结构，我们可以直接恢复解
+                        # x0 = 1 (由 v0 = rmax 保证)
+                        # x_i = (v_{i-1} + rmax) / (2 * c_{i-1}) for i = 1, ..., n
+                        
+                        x = np.zeros(self.n, dtype=int)
+                        for i in range(self.n):
+                            x[i] = int(round((v[i] + self.rmax) / (2 * self.c[i])))
+                        
                         # 验证解
                         if np.allclose(self.A @ x, self.d):
                             sols.append(x.copy())
                 return
             
-            # 枚举 u[idx] 的可能值
-            # TODO: 这里应该用剪枝条件计算精确范围
-            u_range = 100  # 临时范围
+            # 枚举 u[idx]
+            u_range = 100  # TODO: 使用剪枝条件
             
             for u_val in range(-u_range, u_range + 1):
                 u_values[idx] = u_val
                 
-                # 计算 w^(idx) 使用递推公式 (12)
-                # w^(idx) = (sum_{i=idx}^{n_basis-1} u_i * mu_{i,idx}) * b_hat[idx] + w^(idx+1)
-                coeff = u_val * self.mu[idx, idx]  # mu[idx,idx] = 1
+                # 计算 w^(idx)
+                coeff = u_val
                 for j in range(idx + 1, self.n_basis):
                     coeff += u_values[j] * self.mu[j, idx]
                 
                 curr_w = coeff * self.b_hat[idx] + prev_w
                 
-                # 递归到下一层
                 backtrack(idx - 1, u_values, curr_w)
         
         # 初始化
         u_initial = np.zeros(self.n_basis, dtype=int)
         w_initial = np.zeros(self.n + 1)
         
-        # 从最高索引开始回溯 (对应论文中从 u_{n-m+1} 开始)
         backtrack(self.n_basis - 1, u_initial, w_initial)
         
         return sols
