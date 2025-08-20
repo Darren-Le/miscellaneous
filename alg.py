@@ -125,14 +125,58 @@ class MarketSplit:
 
     def enumerate(self):
         sols = []
-        prev_w = 0
-        def backtrack(idx, prev_w, sols):
-            if idx == 0:
+        
+        def backtrack(idx, u_values, prev_w):
+            """
+            回溯算法
+            idx: 当前要确定的 u 的索引 (从 n_basis-1 递减到 0)
+            u_values: 长度为 n_basis 的数组，存储 u_0 到 u_{n_basis-1} 的值
+            prev_w: w^(idx+1) - 上一层的投影向量
+            """
+            if idx == -1:
+                # 所有 u_i 都已确定，构建解向量 v = sum(u_i * basis_i)
+                v = np.zeros(self.n + 1)
+                for i in range(self.n_basis):
+                    v += u_values[i] * self.basis[i]
                 
-
-            return
-
-
+                # 检查是否满足约束: v_0 = rmax 且 -rmax <= v_i <= rmax for all i
+                if abs(v[0] - self.rmax) < 1e-10:  # v_0 应该等于 rmax
+                    if np.all(v >= -self.rmax - 1e-10) and np.all(v <= self.rmax + 1e-10):
+                        # 转为整数解
+                        v_int = np.round(v).astype(int)
+                        # 从 v 恢复原始解 x
+                        x = v_int[1:] // (2 * self.c) + self.r // 2
+                        # 验证解
+                        if np.allclose(self.A @ x, self.d):
+                            sols.append(x.copy())
+                return
+            
+            # 枚举 u[idx] 的可能值
+            # TODO: 这里应该用剪枝条件计算精确范围
+            u_range = 100  # 临时范围
+            
+            for u_val in range(-u_range, u_range + 1):
+                u_values[idx] = u_val
+                
+                # 计算 w^(idx) 使用递推公式 (12)
+                # w^(idx) = (sum_{i=idx}^{n_basis-1} u_i * mu_{i,idx}) * b_hat[idx] + w^(idx+1)
+                coeff = u_val * self.mu[idx, idx]  # mu[idx,idx] = 1
+                for j in range(idx + 1, self.n_basis):
+                    coeff += u_values[j] * self.mu[j, idx]
+                
+                curr_w = coeff * self.b_hat[idx] + prev_w
+                
+                # 递归到下一层
+                backtrack(idx - 1, u_values, curr_w)
+        
+        # 初始化
+        u_initial = np.zeros(self.n_basis, dtype=int)
+        w_initial = np.zeros(self.n + 1)
+        
+        # 从最高索引开始回溯 (对应论文中从 u_{n-m+1} 开始)
+        backtrack(self.n_basis - 1, u_initial, w_initial)
+        
+        return sols
 
 A = np.array([[1,4]], dtype=int)
 d = np.array([4], dtype=int)
