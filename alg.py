@@ -123,6 +123,17 @@ class MarketSplit:
             coordinates.append(x)
         self.coords = np.array(coordinates)
 
+    def enumerate(self):
+        sols = []
+        prev_w = 0
+        def backtrack(idx, prev_w, sols):
+            if idx == 0:
+                
+
+            return
+
+
+
 A = np.array([[1,4]], dtype=int)
 d = np.array([4], dtype=int)
 ms = MarketSplit(A, d)
