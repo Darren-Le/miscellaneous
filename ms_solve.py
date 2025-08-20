@@ -96,7 +96,7 @@ class MarketSplit:
         # Compute orthogonal vectors
         self.b_hat = []
         for i in range(self.n_basis):
-            b_hat_i = self.basis[:, i].astype(float)
+            b_hat_i = self.basis[i].astype(float)
             for j in range(i):
                 b_hat_i = b_hat_i - self.mu[i, j] * self.b_hat[j]
             self.b_hat.append(b_hat_i)
