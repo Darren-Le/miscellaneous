@@ -90,11 +90,11 @@ class MSData:
         if not self.data:
             return {}
         sizes = list(self.by_size.keys())
-        ms = [m for m, n in sizes]
+        ms_data = [m for m, n in sizes]
         ns = [n for m, n in sizes]
         
         print(f"Total instances: {len(self.data)}")
-        print(f"M range: {min(ms)}-{max(ms)}")
+        print(f"M range: {min(ms_data)}-{max(ms_data)}")
         print(f"N range: {min(ns)}-{max(ns)}")
         print(f"Solutions loaded: {len(self.solutions)}")
         print("Instances per size:")
@@ -104,7 +104,7 @@ class MSData:
         
         return {
             'total': len(self.data),
-            'm_range': (min(ms), max(ms)),
+            'm_range': (min(ms_data), max(ms_data)),
             'n_range': (min(ns), max(ns)),
             'per_size': {size: len(self.by_size[size]) for size in sizes}
         }
@@ -133,31 +133,33 @@ class MSData:
 
 # Usage
 if __name__ == "__main__":
-    ms = MSData(r"path/to/data", r"path/to/solutions")
-    print(f"Loaded {len(ms)} instances")
-    ms.stats()
+    data_path = "path/to/data"
+    sol_path = "path/to/sols"
+    ms_data = MSData(sol_path, data_path)
+    print(f"Loaded {len(ms_data)} instances")
+    ms_data.stats()
     
     # Get by ID
-    inst = ms.get(id="ms_03_050_009")
+    inst = ms_data.get(id="ms_03_050_009")
     if inst:
         print(f"Instance {inst['id']}: {inst['m']}x{inst['n']}")
     
     # Get solution
-    sol = ms.get_solution("ms_03_050_009")
+    sol = ms_data.get_solution("ms_03_050_009")
     if sol is not None:
         print(f"Solution: {sol}")
         print(f"Solution length: {len(sol)}")
     
     # Get by m
-    m3_instances = ms.get(m=3)
+    m3_instances = ms_data.get(m=3)
     print(f"Found {len(m3_instances)} instances with m=3")
     
     # Get by n
-    n20_instances = ms.get(n=20)
+    n20_instances = ms_data.get(n=20)
     print(f"Found {len(n20_instances)} instances with n=20")
     
     # Get by size
-    m3_n20_instances = ms.get(m=3, n=20)
+    m3_n20_instances = ms_data.get(m=3, n=20)
     print(f"Found {len(m3_n20_instances)} instances with m=3 and n=20")
     if m3_n20_instances:
         print("m = 3, n = 20 Instance IDs:", [inst['id'] for inst in m3_n20_instances])
@@ -168,6 +170,6 @@ if __name__ == "__main__":
         print(f"Matrix shape: {A.shape}, Vector shape: {d.shape}")
 
     # Test column filter
-    filtered_A = ms.column_filter("ms_03_050_009")
+    filtered_A = ms_data.column_filter("ms_03_050_009")
     if filtered_A is not None:
         print(f"Original A shape: {inst['A'].shape}, Filtered A shape: {filtered_A.shape}")
