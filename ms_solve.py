@@ -347,29 +347,16 @@ if __name__ == "__main__":
                   f"dive_loops: {result['dive_loops']}, time: {result['solve_time']:.4f}s")
         print()
 
-    # Static summary
+    # Results table
     print("=" * 80)
-    print("SUMMARY RESULTS")
+    print("RESULTS")
     print("=" * 80)
-    
-    for m in test_m_values:
-        m_results = [r for r in all_results if ms_data.get(id=r['id'])['m'] == m]
-        successful = [r for r in m_results if r['success']]
-        optimal_found = [r for r in successful if r['optimal_found']]
-        
-        print(f"\nM = {m} ({len(m_results)} instances):")
-        print(f"  Success rate:     {len(successful)}/{len(m_results)} ({100*len(successful)/len(m_results):.1f}%)")
-        print(f"  Optimal found:    {len(optimal_found)}/{len(successful)} ({100*len(optimal_found)/len(successful):.1f}% of successful)")
-        
-        if successful:
-            times = [r['solve_time'] for r in successful]
-            bt_loops = [r['backtrack_loops'] for r in successful]
-            dive_loops = [r['dive_loops'] for r in successful]
-            solutions = [r['solutions_count'] for r in successful]
-            
-            print(f"  Avg solve time:   {np.mean(times):.4f}s (min: {min(times):.4f}s, max: {max(times):.4f}s)")
-            print(f"  Avg bt_loops:     {np.mean(bt_loops):.0f} (min: {min(bt_loops)}, max: {max(bt_loops)})")
-            print(f"  Avg dive_loops:   {np.mean(dive_loops):.0f} (min: {min(dive_loops)}, max: {max(dive_loops)})")
-            print(f"  Avg solutions:    {np.mean(solutions):.1f} (min: {min(solutions)}, max: {max(solutions)})")
-    
+
+    print(f"{'ID':<15} {'Status':<8} {'Time(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}")
+    print("-" * 80)
+
+    for result in all_results:
+        status = "SUCCESS" if result['success'] else "FAILED"
+        print(f"{result['id']:<15} {status:<8} {result['solve_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}")
+
     print("\n" + "=" * 80)
