@@ -40,6 +40,7 @@ class MarketSplit:
         self._mu.flags.writeable = False
         
         self.verify_gso()
+        self.verify_dual()
 
     @property
     def basis(self):
@@ -158,6 +159,18 @@ class MarketSplit:
         print("GSO verification passed")
         return True
 
+    def verify_dual(self, tol=1e-10):
+        """Verify that b_bar is the dual of basis: <b_bar[i], basis[j]> = δ_ij"""
+        for i in range(self.n_basis):
+            for j in range(self.n_basis):
+                dot_product = np.dot(self.b_bar[i], self.basis[j])
+                expected = 1.0 if i == j else 0.0
+                if abs(dot_product - expected) > tol:
+                    print(f"Dual property failed: <b_bar[{i}], basis[{j}]> = {dot_product}, expected {expected}")
+                    return False
+        
+        print("Dual verification passed")
+        return True
     def _compute_dual_norms(self):
         B = self._basis.T
         B_T = self._basis
