@@ -1,5 +1,5 @@
 import numpy as np
-from fpylll import IntegerMatrix, LLL, GSO
+from fpylll import IntegerMatrix, LLL
 from math import gcd
 from functools import reduce
 from ms_data import MSData
@@ -287,8 +287,8 @@ def ms_run(A, d, instance_id, opt_sol=None):
 
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
-    data_path = "path/to/data"
-    sol_path = "path/to/solutions"
+    data_path = "ms_instance/01-marketsplit/instances"
+    sol_path = "ms_instance/01-marketsplit/solutions"
     ms_data = MSData(data_path, sol_path)
 
     instance_id = "ms_03_050_009"
