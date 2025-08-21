@@ -7,7 +7,7 @@ import time
 from ms_data import MSData
 
 class MarketSplit:
-    def __init__(self, A, d, r=None, debug=False):
+    def __init__(self, A, d, r=None, max_sols=-1, debug=False):
         # Set up logger
         self.logger = logging.getLogger(__name__)
         if debug:
@@ -27,6 +27,8 @@ class MarketSplit:
 
         self.backtrack_loops = 0
         self.dive_loops = 0
+        self.first_solution_time = None
+        self.max_sols = max_sols  # -1 means find all solutions
 
         self.rmax = None
         self.c = None
@@ -214,6 +216,7 @@ class MarketSplit:
         return True
 
     def enumerate(self):
+        start_time = time.time()  # Track start time
         sols = []
         c = (self.n + 1) * self.rmax ** 2  # 预计算常数
 
@@ -253,14 +256,22 @@ class MarketSplit:
                         
                         # 验证解
                         if np.allclose(self.A @ x, self.d):
+                            # Track first solution time
+                            if self.first_solution_time is None:
+                                self.first_solution_time = time.time() - start_time
+                            
                             sols.append(x.copy())
-                return
+
+                            # Check if we've found enough solutions
+                            if self.max_sols > 0 and len(sols) >= self.max_sols:
+                                return True  # Signal to stop search
+                return False
             
             # 第一个剪枝条件：检查 ||w^(idx+1)||_2^2 是否已经超过界限
             prev_w_norm_sq = np.dot(prev_w, prev_w)
             if prev_w_norm_sq > c:
                 self.dive_loops += 1
-                return  # 剪枝
+                return False # 剪枝
             
             # 计算 sum_{i=idx+1}^{n_basis-1} u_i * mu_{i,idx}
             mu_sum = 0.0
@@ -304,7 +315,10 @@ class MarketSplit:
                     # 如果 coeff <= 0，只跳过当前值
                     continue
                 
-                backtrack(idx - 1, u_values, curr_w)
+                if backtrack(idx - 1, u_values, curr_w):
+                    return True
+            
+            return False
         
         # 开始回溯
         u_values = np.zeros(self.n_basis, dtype=int)
@@ -313,10 +327,10 @@ class MarketSplit:
         
         return sols
 
-def ms_run(A, d, instance_id, opt_sol=None, debug=False):
+def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
     try:
         start_time = time.time()
-        ms = MarketSplit(A, d, debug=debug)
+        ms = MarketSplit(A, d, debug=debug, max_sols=max_sols)
         solutions = ms.enumerate()
         solve_time = time.time() - start_time
         
@@ -331,6 +345,7 @@ def ms_run(A, d, instance_id, opt_sol=None, debug=False):
             'backtrack_loops': ms.backtrack_loops,
             'dive_loops': ms.dive_loops,
             'solve_time': solve_time,
+            'first_solution_time': ms.first_solution_time or 0,
             'success': True
         }
     except Exception as e:
@@ -341,6 +356,7 @@ def ms_run(A, d, instance_id, opt_sol=None, debug=False):
             'backtrack_loops': 0,
             'dive_loops': 0,
             'solve_time': 0,
+            'first_solution_time': 0,
             'success': False,
             'error': str(e)
         }
@@ -353,6 +369,7 @@ if __name__ == "__main__":
     ms_data = MSData(data_path, sol_path)
 
     debug_mode = False
+    max_sols = -1
     test_m_values = [3, 4, 5]
     all_results = []
 
@@ -363,15 +380,16 @@ if __name__ == "__main__":
         for inst in instances:
             A, d = inst['A'], inst['d']
             opt_sol = ms_data.get_solution(inst['id'])
-            result = ms_run(A, d, inst['id'], opt_sol, debug=debug_mode)
+            result = ms_run(A, d, inst['id'], opt_sol, max_sols, debug=debug_mode)
             all_results.append(result)
             
-            # Dynamic printing
             status = "✓" if result['success'] else "✗"
             opt_status = "✓" if result['optimal_found'] else "✗"
+            # Dynamic printing
             print(f"{status} {result['id']}: {result['solutions_count']} solutions, "
-                  f"optimal: {opt_status}, bt_loops: {result['backtrack_loops']}, "
-                  f"dive_loops: {result['dive_loops']}, time: {result['solve_time']:.4f}s")
+                f"optimal: {opt_status}, bt_loops: {result['backtrack_loops']}, "
+                f"dive_loops: {result['dive_loops']}, time: {result['solve_time']:.4f}s, "
+                f"1st_sol: {result['first_solution_time']:.4f}s")
         print()
 
     # Results table
@@ -379,14 +397,14 @@ if __name__ == "__main__":
     print("RESULTS")
     print("=" * 80)
 
-    print(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Time(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}")
-    print("-" * 80)
+    print(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}")
+    print("-" * 90)
 
     for result in all_results:
         inst = ms_data.get(id=result['id'])
         m, n = inst['A'].shape
         size = f"({m},{n})"
         status = "SUCCESS" if result['success'] else "FAILED"
-        print(f"{result['id']:<15} {size:<8} {status:<8} {result['solve_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}")
+        print(f"{result['id']:<15} {size:<8} {status:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}")
 
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 90)
