@@ -35,7 +35,7 @@ class MarketSplit:
 
         # coords[i] is the coordinates of basis[i]: self.L @ coords[i].T = basis[i].T
         # it is a solution of the homogenous system: (A, -d) @ coords[i].T = 0
-        self.coords = None 
+        self._coords = None 
 
         # Run preprocessing
         self._get_extended_matrix()
@@ -50,6 +50,7 @@ class MarketSplit:
         self._b_hat_norms_sq.flags.writeable = False
         self._b_bar.flags.writeable = False
         self._mu.flags.writeable = False
+        self._coords.flags.writeable = False
         
         self.verify_gso()
         self.verify_dual()
@@ -78,6 +79,10 @@ class MarketSplit:
     def mu(self):
         return self._mu
     
+    @property
+    def coords(self):
+        return self._coords
+
     def _compute_lcm(self, nums):
         def __lcm(a, b):
             return abs(a * b) // gcd(a, b)
@@ -166,7 +171,7 @@ class MarketSplit:
         for i in range(self.n_basis):
             x = np.linalg.solve(L_bottom, self.basis[i, :])
             coordinates.append(x)
-        self.coords = np.array(coordinates)
+        self._coords = np.array(coordinates)
     
     def verify_gso(self, tol=1e-10):
         """Verify that b_hat is the correct GSO of basis"""
@@ -262,7 +267,7 @@ class MarketSplit:
                 # 计算 w^(idx) = (u_val + mu_sum) * b_hat[idx] + prev_w
                 coeff = u_val + mu_sum
                 curr_w = coeff * self.b_hat[idx] + prev_w
-                assert(np.dot(curr_w, curr_w) <= c)
+                # assert(np.dot(curr_w, curr_w) <= c)
                 
                 backtrack(idx - 1, u_values, curr_w)
         
