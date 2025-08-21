@@ -214,10 +214,12 @@ if __name__ == "__main__":
         print(f"Basis shape: {ms.basis.shape}")
         print(f"Coordinates shape: {ms.coords.shape}")
         
-        # 可选：运行枚举算法
-        # print("\nRunning enumeration...")
-        # solutions = ms.enumerate()
-        # print(f"Found {len(solutions)} solutions")
+        # 运行枚举算法
+        print("\nRunning enumeration...")
+        solutions = ms.enumerate()
+        print(f"Found {len(solutions)} solutions")
+        for sol in solutions:
+            print(sol)
         
     except Exception as e:
         print(f"Error creating MarketSplit instance: {e}")

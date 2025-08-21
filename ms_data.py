@@ -3,12 +3,15 @@ import numpy as np
 from pathlib import Path
 
 class MSData:
-    def __init__(self, path):
+    def __init__(self, path, sol_path=None):
         self.path = Path(path)
+        self.sol_path = Path(sol_path) if sol_path else self.path
         self.data = []
         self.by_size = {}
         self.by_id = {}
+        self.solutions = {}
         self._load()
+        self._load_solutions()
     
     def _load(self):
         for f in self.path.glob('*.dat'):
@@ -38,8 +41,36 @@ class MSData:
             except:
                 pass
     
+    def _load_solutions(self):
+        for f in self.sol_path.glob('*.opt.sol'):
+            try:
+                with open(f, 'r') as file:
+                    lines = [l.strip() for l in file if l.strip() and not l.startswith('#')]
+                
+                x_vars = {}
+                for line in lines:
+                    if line.startswith('x#'):
+                        parts = line.split()
+                        var_num = int(parts[0][2:])
+                        var_val = int(parts[1])
+                        x_vars[var_num] = var_val
+                
+                if x_vars:
+                    n = max(x_vars.keys())
+                    x = np.zeros(n, dtype=int)
+                    for i in range(1, n + 1):
+                        x[i - 1] = x_vars.get(i, 0)
+                    
+                    id = f.stem.replace('.opt', '')
+                    self.solutions[id] = x
+            except:
+                pass
+    
     def get(self, id):
         return self.by_id.get(id)
+    
+    def get_solution(self, id):
+        return self.solutions.get(id)
     
     def size(self, m, n):
         return self.by_size.get((m, n), [])
@@ -57,6 +88,7 @@ class MSData:
         print(f"Total instances: {len(self.data)}")
         print(f"M range: {min(ms)}-{max(ms)}")
         print(f"N range: {min(ns)}-{max(ns)}")
+        print(f"Solutions loaded: {len(self.solutions)}")
         print("Instances per size:")
         for size in sorted(sizes):
             count = len(self.by_size[size])
@@ -77,14 +109,20 @@ class MSData:
 
 # Usage
 if __name__ == "__main__":
-    ms = MSData(r"path/to/data")
+    ms = MSData(r"path/to/data", r"path/to/solutions")
     print(f"Loaded {len(ms)} instances")
     ms.stats()
     
     # Get by ID
-    inst = ms.get("ms_15_200_003")
+    inst = ms.get("ms_03_050_002")
     if inst:
         print(f"Instance {inst['id']}: {inst['m']}x{inst['n']}")
+    
+    # Get solution
+    sol = ms.get_solution("ms_03_050_002")
+    if sol is not None:
+        print(f"Solution: {sol}")
+        print(f"Solution length: {len(sol)}")
     
     # Get by size
     instances = ms.size(3, 20)
