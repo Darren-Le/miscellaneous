@@ -190,8 +190,9 @@ class MarketSplit:
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
     # 1. 加载数据
-    data_path = "path/to/data"  # 替换为你的数据文件夹路径
-    ms_data = MSData(data_path)
+    data_path = "path/to/data"
+    sol_path = "path/to/solutions"
+    ms_data = MSData(data_path, sol_path)
     
     # 2. 获取特定实例
     instance_id = "ms_03_050_002"
