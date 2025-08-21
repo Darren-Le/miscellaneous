@@ -217,6 +217,14 @@ class MarketSplit:
         sols = []
         c = (self.n + 1) * self.rmax ** 2  # 预计算常数
 
+        # 第二个剪枝策略：预计算每个 u_i 的全局界
+        sqrt_c = np.sqrt(c)
+        u_bounds_l2 = self.b_bar_norms['l2'] * sqrt_c
+        u_bounds_l1 = self.b_bar_norms['l1'] * self.rmax
+        # 取最紧界
+        u_global_bounds = np.minimum(u_bounds_l2, u_bounds_l1)
+
+
         def backtrack(idx, u_values, prev_w):
             """
             回溯算法
@@ -266,8 +274,16 @@ class MarketSplit:
             bound = np.sqrt(max(0, bound_sq))
             
             # u_idx 的范围是: -bound - mu_sum <= u_idx <= bound - mu_sum
-            u_min = int(np.floor(-bound - mu_sum))
-            u_max = int(np.ceil(bound - mu_sum))
+            u_min_pruning1 = int(np.floor(-bound - mu_sum))
+            u_max_pruning1 = int(np.ceil(bound - mu_sum))
+            
+            # 第二个剪枝策略：应用全局界
+            u_min_pruning2 = int(np.floor(-u_global_bounds[idx]))
+            u_max_pruning2 = int(np.ceil(u_global_bounds[idx]))
+            
+            # 取两个界限的交集
+            u_min = max(u_min_pruning1, u_min_pruning2)
+            u_max = min(u_max_pruning1, u_max_pruning2)
             
             for u_val in range(u_min, u_max + 1):
                 u_values[idx] = u_val
