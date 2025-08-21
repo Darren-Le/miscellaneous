@@ -224,7 +224,6 @@ class MarketSplit:
         # 取最紧界
         u_global_bounds = np.minimum(u_bounds_l2, u_bounds_l1)
 
-
         def backtrack(idx, u_values, prev_w):
             """
             回溯算法
@@ -281,21 +280,35 @@ class MarketSplit:
             u_min_pruning2 = int(np.floor(-u_global_bounds[idx]))
             u_max_pruning2 = int(np.ceil(u_global_bounds[idx]))
             
-            # 取两个界限的交集
+            # 取两个界的交集
             u_min = max(u_min_pruning1, u_min_pruning2)
             u_max = min(u_max_pruning1, u_max_pruning2)
             
+            # 第三个剪枝策略：使用定理2进行剪枝
             for u_val in range(u_min, u_max + 1):
                 u_values[idx] = u_val
                 
                 # 计算 w^(idx) = (u_val + mu_sum) * b_hat[idx] + prev_w
                 coeff = u_val + mu_sum
                 curr_w = coeff * self.b_hat[idx] + prev_w
-                # assert(np.dot(curr_w, curr_w) <= c)
+                
+                # 剪枝条件：检查 ||w||_2^2 <= rmax * ||w||_1
+                w_norm_sq = np.dot(curr_w, curr_w)
+                w_norm_l1 = np.sum(np.abs(curr_w))
+                
+                if w_norm_sq > self.rmax * w_norm_l1:
+                    # 如果当前w不满足条件，跳过所有相同方向的值
+                    # 如果coeff > 0，跳过所有更大的u_val
+                    # 如果coeff < 0，跳过所有更小的u_val
+                    if coeff > 0:
+                        # 跳过剩余的正方向值
+                        break
+                    # 如果coeff < 0，继续循环会自然跳过负方向的值
+                    continue
                 
                 backtrack(idx - 1, u_values, curr_w)
         
-        # Start backtracking
+        # 开始回溯
         u_values = np.zeros(self.n_basis, dtype=int)
         initial_w = np.zeros(self.n + 1)
         backtrack(self.n_basis - 1, u_values, initial_w)
