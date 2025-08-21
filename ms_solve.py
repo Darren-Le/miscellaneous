@@ -352,11 +352,14 @@ if __name__ == "__main__":
     print("RESULTS")
     print("=" * 80)
 
-    print(f"{'ID':<15} {'Status':<8} {'Time(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}")
+    print(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Time(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}")
     print("-" * 80)
 
     for result in all_results:
+        inst = ms_data.get(id=result['id'])
+        m, n = inst['A'].shape
+        size = f"({m},{n})"
         status = "SUCCESS" if result['success'] else "FAILED"
-        print(f"{result['id']:<15} {status:<8} {result['solve_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}")
+        print(f"{result['id']:<15} {size:<8} {status:<8} {result['solve_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}")
 
     print("\n" + "=" * 80)
