@@ -66,8 +66,17 @@ class MSData:
             except:
                 pass
     
-    def get(self, id):
-        return self.by_id.get(id)
+    def get(self, m=None, n=None, id=None):
+        if id is not None:
+            return self.by_id.get(id)
+        
+        results = self.data
+        if m is not None:
+            results = [inst for inst in results if inst['m'] == m]
+        if n is not None:
+            results = [inst for inst in results if inst['n'] == n]
+        
+        return results
     
     def get_solution(self, id):
         return self.solutions.get(id)
@@ -114,7 +123,7 @@ if __name__ == "__main__":
     ms.stats()
     
     # Get by ID
-    inst = ms.get("ms_03_050_002")
+    inst = ms.get(id="ms_03_050_002")
     if inst:
         print(f"Instance {inst['id']}: {inst['m']}x{inst['n']}")
     
@@ -124,11 +133,19 @@ if __name__ == "__main__":
         print(f"Solution: {sol}")
         print(f"Solution length: {len(sol)}")
     
+    # Get by m
+    m3_instances = ms.get(m=3)
+    print(f"Found {len(m3_instances)} instances with m=3")
+    
+    # Get by n
+    n20_instances = ms.get(n=20)
+    print(f"Found {len(n20_instances)} instances with n=20")
+    
     # Get by size
-    instances = ms.size(3, 20)
-    print(f"Found {len(instances)} instances of size 3x20")
-    if instances:
-        print("Instance IDs:", [inst['id'] for inst in instances])
+    m3_n20_instances = ms.get(m=3, n=20)
+    print(f"Found {len(m3_n20_instances)} instances with m=3 and n=20")
+    if m3_n20_instances:
+        print("m = 3, n = 20 Instance IDs:", [inst['id'] for inst in m3_n20_instances])
     
     # Access matrix and vector
     if inst:

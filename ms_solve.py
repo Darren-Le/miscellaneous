@@ -187,44 +187,46 @@ class MarketSplit:
         
         return sols
 
+def ms_run(A, d, instance_id, opt_sol=None):
+    try:
+        ms = MarketSplit(A, d)
+        solutions = ms.enumerate()
+        
+        found_opt = False
+        if opt_sol is not None:
+            found_opt = any(np.array_equal(sol, opt_sol) for sol in solutions)
+        
+        return {
+            'id': instance_id,
+            'solutions_count': len(solutions),
+            'optimal_found': found_opt,
+            'success': True
+        }
+    except Exception as e:
+        return {
+            'id': instance_id,
+            'solutions_count': 0,
+            'optimal_found': False,
+            'success': False,
+            'error': str(e)
+        }
+
+
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
-    # 1. 加载数据
     data_path = "path/to/data"
     sol_path = "path/to/solutions"
     ms_data = MSData(data_path, sol_path)
     
-    # 2. 获取特定实例
-    instance_id = "ms_03_050_002"
-    inst = ms_data.get(instance_id)
+    instances = ms_data.get(m=3)
+    print(f"Testing {len(instances)} instances with m = 3")
     
-    # 3. 提取A和d矩阵
-    A = inst['A']
-    d = inst['d']
-    
-    print(f"Loaded instance {instance_id}:")
-    print(f"  Matrix A shape: {A.shape}")
-    print(f"  Vector d shape: {d.shape}")
-    print(f"  A = \n{A}")
-    print(f"  d = {d}")
-    
-    # 4. 创建MarketSplit实例并求解
-    try:
-        ms = MarketSplit(A, d)
-        print(f"\nExtended matrix L shape: {ms.L.shape}")
-        print(f"Basis shape: {ms.basis.shape}")
-        print(f"Coordinates shape: {ms.coords.shape}")
+    for inst in instances:
+        A, d = inst['A'], inst['d']
+        opt_sol = ms_data.get_solution(inst['id'])
         
-        # 运行枚举算法
-        print("\nRunning enumeration...")
-        solutions = ms.enumerate()
-        print(f"Found {len(solutions)} solutions")
-
-        opt_sol = ms_data.get_solution(instance_id)
-        if opt_sol is not None:
-            found_opt = any(np.array_equal(sol, opt_sol) for sol in solutions)
-            print(f"Optimal solution found: {found_opt}")
-            print(f"Optimal solution is: {opt_sol}")
-
-    except Exception as e:
-        print(f"Error creating MarketSplit instance: {e}")
+        result = ms_run(A, d, inst['id'], opt_sol)
+        
+        status = "✓" if result['success'] else "✗"
+        opt_status = "✓" if result['optimal_found'] else "✗"
+        print(f"{status} {result['id']}: {result['solutions_count']} solutions, optimal: {opt_status}")
