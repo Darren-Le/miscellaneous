@@ -1,4 +1,3 @@
-import os
 import numpy as np
 from pathlib import Path
 
@@ -110,6 +109,22 @@ class MSData:
             'per_size': {size: len(self.by_size[size]) for size in sizes}
         }
     
+    def column_filter(self, instance_id):
+    """Filter A matrix columns based on optimal solution (keep only columns where opt_sol == 1)"""
+        inst = self.get(id=instance_id)
+        if inst is None:
+            return None
+            
+        opt_sol = self.get_solution(instance_id)
+        if opt_sol is None:
+            return None
+        
+        # Keep only columns where optimal solution is 1
+        mask = opt_sol == 1
+        filtered_A = inst['A'][:, mask]
+        
+        return filtered_A
+    
     def __len__(self):
         return len(self.data)
     
@@ -123,12 +138,12 @@ if __name__ == "__main__":
     ms.stats()
     
     # Get by ID
-    inst = ms.get(id="ms_03_050_002")
+    inst = ms.get(id="ms_03_050_009")
     if inst:
         print(f"Instance {inst['id']}: {inst['m']}x{inst['n']}")
     
     # Get solution
-    sol = ms.get_solution("ms_03_050_002")
+    sol = ms.get_solution("ms_03_050_009")
     if sol is not None:
         print(f"Solution: {sol}")
         print(f"Solution length: {len(sol)}")
@@ -151,3 +166,8 @@ if __name__ == "__main__":
     if inst:
         A, d = inst['A'], inst['d']
         print(f"Matrix shape: {A.shape}, Vector shape: {d.shape}")
+
+    # Test column filter
+    filtered_A = ms.column_filter("ms_03_050_009")
+    if filtered_A is not None:
+        print(f"Original A shape: {inst['A'].shape}, Filtered A shape: {filtered_A.shape}")
