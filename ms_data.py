@@ -110,7 +110,7 @@ class MSData:
         }
     
     def column_filter(self, instance_id):
-    """Filter A matrix columns based on optimal solution (keep only columns where opt_sol == 1)"""
+        """Filter A matrix columns based on optimal solution (keep only columns where opt_sol == 1)"""
         inst = self.get(id=instance_id)
         if inst is None:
             return None
@@ -135,7 +135,7 @@ class MSData:
 if __name__ == "__main__":
     data_path = "path/to/data"
     sol_path = "path/to/sols"
-    ms_data = MSData(sol_path, data_path)
+    ms_data = MSData(data_path, sol_path)
     print(f"Loaded {len(ms_data)} instances")
     ms_data.stats()
     
