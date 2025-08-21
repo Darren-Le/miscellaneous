@@ -309,8 +309,21 @@ if __name__ == "__main__":
     sol_path = "ms_instance/01-marketsplit/solutions"
     ms_data = MSData(data_path, sol_path)
 
-    instance_id = "ms_03_050_009"
-    inst = ms_data.get(id=instance_id)
-    A, d = inst['A'], inst['d']
-    res = ms_run(A, d, instance_id, debug=True)
-    print(res)
+    # instance_id = "ms_03_050_009"
+    # inst = ms_data.get(id=instance_id)
+    # A, d = inst['A'], inst['d']
+    # res = ms_run(A, d, instance_id, debug=True)
+    # print(res)
+
+    debug_mode = False
+    m = 4
+    instances = ms_data.get(m=m)
+    print(f"Testing {len(instances)} instances with m = {m}")
+
+    for inst in instances:
+        A, d = inst['A'], inst['d']
+        opt_sol = ms_data.get_solution(inst['id'])
+        result = ms_run(A, d, instance_id, debug=debug_mode)
+        status = "√" if result['success'] else "×"
+        opt_status = "√" if result['optimal_found'] else "×"
+        print(f"{status} {result['id']}: {result['solution_count']} solutions, optimal: {opt_status}")
