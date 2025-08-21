@@ -188,9 +188,9 @@ if __name__ == "__main__":
         print(f"Matrix shape: {A.shape}, Vector shape: {d.shape}")
 
     # Test column filter
-    filtered_A = ms.column_filter("ms_03_050_009")
-    filtered_A_plus1 = ms.column_filter("ms_03_050_009", additional_cols=1)
-    filtered_A_plus2 = ms.column_filter("ms_03_050_009", additional_cols=2)
+    filtered_A = ms_data.column_filter("ms_03_050_009")
+    filtered_A_plus1 = ms_data.column_filter("ms_03_050_009", additional_cols=1)
+    filtered_A_plus2 = ms_data.column_filter("ms_03_050_009", additional_cols=2)
     if filtered_A is not None:
         print(f"Original A shape: {inst['A'].shape}")
         print(f"Filtered A shape: {filtered_A.shape}")
