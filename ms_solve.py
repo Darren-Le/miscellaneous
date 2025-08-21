@@ -3,6 +3,7 @@ from fpylll import IntegerMatrix, LLL
 from math import gcd
 from functools import reduce
 import logging
+import time
 from ms_data import MSData
 
 class MarketSplit:
@@ -23,6 +24,9 @@ class MarketSplit:
         self.m, self.n = A.shape
         self.n_basis = self.n - self.m + 1
         self.r = r if r else np.ones(self.n, dtype=int)
+
+        self.backtrack_loops = 0
+        self.dive_loops = 0
 
         self.rmax = None
         self.c = None
@@ -220,7 +224,10 @@ class MarketSplit:
             u_values: 长度为 n_basis 的数组
             prev_w: w^(idx+1)
             """
+            self.backtrack_loops += 1
+
             if idx == -1:
+                self.dive_loops += 1
                 # 计算 v = sum(u_i * basis_i)
                 v = np.zeros(self.n + 1)
                 for i in range(self.n_basis):
@@ -245,6 +252,7 @@ class MarketSplit:
             # 第一个剪枝条件：检查 ||w^(idx+1)||_2^2 是否已经超过界限
             prev_w_norm_sq = np.dot(prev_w, prev_w)
             if prev_w_norm_sq > c:
+                self.dive_loops += 1
                 return  # 剪枝
             
             # 计算 sum_{i=idx+1}^{n_basis-1} u_i * mu_{i,idx}
@@ -280,8 +288,10 @@ class MarketSplit:
 
 def ms_run(A, d, instance_id, opt_sol=None, debug=False):
     try:
+        start_time = time.time()
         ms = MarketSplit(A, d, debug=debug)
         solutions = ms.enumerate()
+        solve_time = time.time() - start_time
         
         found_opt = False
         if opt_sol is not None:
@@ -291,6 +301,9 @@ def ms_run(A, d, instance_id, opt_sol=None, debug=False):
             'id': instance_id,
             'solutions_count': len(solutions),
             'optimal_found': found_opt,
+            'backtrack_loops': ms.backtrack_loops,
+            'dive_loops': ms.dive_loops,
+            'solve_time': solve_time,
             'success': True
         }
     except Exception as e:
@@ -298,6 +311,9 @@ def ms_run(A, d, instance_id, opt_sol=None, debug=False):
             'id': instance_id,
             'solutions_count': 0,
             'optimal_found': False,
+            'backtrack_loops': 0,
+            'dive_loops': 0,
+            'solve_time': 0,
             'success': False,
             'error': str(e)
         }
@@ -309,21 +325,51 @@ if __name__ == "__main__":
     sol_path = "ms_instance/01-marketsplit/solutions"
     ms_data = MSData(data_path, sol_path)
 
-    # instance_id = "ms_03_050_009"
-    # inst = ms_data.get(id=instance_id)
-    # A, d = inst['A'], inst['d']
-    # res = ms_run(A, d, instance_id, debug=True)
-    # print(res)
-
     debug_mode = False
-    m = 4
-    instances = ms_data.get(m=m)
-    print(f"Testing {len(instances)} instances with m = {m}")
+    test_m_values = [3, 4, 5]
+    all_results = []
 
-    for inst in instances:
-        A, d = inst['A'], inst['d']
-        opt_sol = ms_data.get_solution(inst['id'])
-        result = ms_run(A, d, inst['id'], debug=debug_mode)
-        status = "√" if result['success'] else "×"
-        opt_status = "√" if result['optimal_found'] else "×"
-        print(f"{status} {result['id']}: {result['solution_count']} solutions, optimal: {opt_status}")
+    for m in test_m_values:
+        instances = ms_data.get(m=m)
+        print(f"Testing {len(instances)} instances with m = {m}")
+        
+        for inst in instances:
+            A, d = inst['A'], inst['d']
+            opt_sol = ms_data.get_solution(inst['id'])
+            result = ms_run(A, d, inst['id'], opt_sol, debug=debug_mode)
+            all_results.append(result)
+            
+            # Dynamic printing
+            status = "✓" if result['success'] else "✗"
+            opt_status = "✓" if result['optimal_found'] else "✗"
+            print(f"{status} {result['id']}: {result['solutions_count']} solutions, "
+                  f"optimal: {opt_status}, bt_loops: {result['backtrack_loops']}, "
+                  f"dive_loops: {result['dive_loops']}, time: {result['solve_time']:.4f}s")
+        print()
+
+    # Static summary
+    print("=" * 80)
+    print("SUMMARY RESULTS")
+    print("=" * 80)
+    
+    for m in test_m_values:
+        m_results = [r for r in all_results if ms_data.get(id=r['id'])['m'] == m]
+        successful = [r for r in m_results if r['success']]
+        optimal_found = [r for r in successful if r['optimal_found']]
+        
+        print(f"\nM = {m} ({len(m_results)} instances):")
+        print(f"  Success rate:     {len(successful)}/{len(m_results)} ({100*len(successful)/len(m_results):.1f}%)")
+        print(f"  Optimal found:    {len(optimal_found)}/{len(successful)} ({100*len(optimal_found)/len(successful):.1f}% of successful)")
+        
+        if successful:
+            times = [r['solve_time'] for r in successful]
+            bt_loops = [r['backtrack_loops'] for r in successful]
+            dive_loops = [r['dive_loops'] for r in successful]
+            solutions = [r['solutions_count'] for r in successful]
+            
+            print(f"  Avg solve time:   {np.mean(times):.4f}s (min: {min(times):.4f}s, max: {max(times):.4f}s)")
+            print(f"  Avg bt_loops:     {np.mean(bt_loops):.0f} (min: {min(bt_loops)}, max: {max(bt_loops)})")
+            print(f"  Avg dive_loops:   {np.mean(dive_loops):.0f} (min: {min(dive_loops)}, max: {max(dive_loops)})")
+            print(f"  Avg solutions:    {np.mean(solutions):.1f} (min: {min(solutions)}, max: {max(solutions)})")
+    
+    print("\n" + "=" * 80)
