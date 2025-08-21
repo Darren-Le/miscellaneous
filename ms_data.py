@@ -151,8 +151,8 @@ class MSData:
 
 # Usage
 if __name__ == "__main__":
-    data_path = "path/to/data"
-    sol_path = "path/to/sols"
+    data_path = "ms_instance/01-marketsplit/instances"
+    sol_path = "ms_instance/01-marketsplit/solutions"
     ms_data = MSData(data_path, sol_path)
     print(f"Loaded {len(ms_data)} instances")
     ms_data.stats()
