@@ -323,7 +323,7 @@ if __name__ == "__main__":
     for inst in instances:
         A, d = inst['A'], inst['d']
         opt_sol = ms_data.get_solution(inst['id'])
-        result = ms_run(A, d, instance_id, debug=debug_mode)
+        result = ms_run(A, d, inst['id'], debug=debug_mode)
         status = "√" if result['success'] else "×"
         opt_status = "√" if result['optimal_found'] else "×"
         print(f"{status} {result['id']}: {result['solution_count']} solutions, optimal: {opt_status}")
