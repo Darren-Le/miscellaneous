@@ -2,10 +2,22 @@ import numpy as np
 from fpylll import IntegerMatrix, LLL
 from math import gcd
 from functools import reduce
+import logging
 from ms_data import MSData
 
 class MarketSplit:
-    def __init__(self, A, d, r=None):
+    def __init__(self, A, d, r=None, debug=False):
+        # Set up logger
+        self.logger = logging.getLogger(__name__)
+        if debug:
+            self.logger.setLevel(logging.DEBUG)
+            if not self.logger.handlers:
+                handler = logging.StreamHandler()
+                handler.setFormatter(logging.Formatter('%(message)s'))
+                self.logger.addHandler(handler)
+        else:
+            self.logger.setLevel(logging.WARNING)
+        
         self.A = A
         self.d = d
         self.m, self.n = A.shape
@@ -135,42 +147,7 @@ class MarketSplit:
             
             # Compute squared norm
             self._b_hat_norms_sq[i] = np.dot(self._b_hat[i], self._b_hat[i])
-
-    def verify_gso(self, tol=1e-10):
-        """Verify that b_hat is the correct GSO of basis"""
-        # Check orthogonality
-        for i in range(self.n_basis):
-            for j in range(i + 1, self.n_basis):
-                dot_product = np.dot(self.b_hat[i], self.b_hat[j])
-                if abs(dot_product) > tol:
-                    print(f"Orthogonality failed: b_hat[{i}] · b_hat[{j}] = {dot_product}")
-                    return False
         
-        # Check GSO formula: basis[i] = b_hat[i] + sum(mu[i,j] * b_hat[j] for j < i)
-        for i in range(self.n_basis):
-            reconstructed = self.b_hat[i].copy()
-            for j in range(i):
-                reconstructed += self.mu[i, j] * self.b_hat[j]
-            
-            if not np.allclose(self.basis[i], reconstructed, atol=tol):
-                print(f"GSO formula failed for basis[{i}]")
-                return False
-        
-        print("GSO verification passed")
-        return True
-
-    def verify_dual(self, tol=1e-10):
-        """Verify that b_bar is the dual of basis: <b_bar[i], basis[j]> = δ_ij"""
-        for i in range(self.n_basis):
-            for j in range(self.n_basis):
-                dot_product = np.dot(self.b_bar[i], self.basis[j])
-                expected = 1.0 if i == j else 0.0
-                if abs(dot_product - expected) > tol:
-                    print(f"Dual property failed: <b_bar[{i}], basis[{j}]> = {dot_product}, expected {expected}")
-                    return False
-        
-        print("Dual verification passed")
-        return True
     def _compute_dual_norms(self):
         B = self._basis.T
         B_T = self._basis
@@ -190,6 +167,42 @@ class MarketSplit:
             x = np.linalg.solve(L_bottom, self.basis[i, :])
             coordinates.append(x)
         self.coords = np.array(coordinates)
+    
+    def verify_gso(self, tol=1e-10):
+        """Verify that b_hat is the correct GSO of basis"""
+        # Check orthogonality
+        for i in range(self.n_basis):
+            for j in range(i + 1, self.n_basis):
+                dot_product = np.dot(self.b_hat[i], self.b_hat[j])
+                if abs(dot_product) > tol:
+                    self.logger.debug(f"Orthogonality failed: b_hat[{i}] · b_hat[{j}] = {dot_product}")
+                    return False
+        
+        # Check GSO formula: basis[i] = b_hat[i] + sum(mu[i,j] * b_hat[j] for j < i)
+        for i in range(self.n_basis):
+            reconstructed = self.b_hat[i].copy()
+            for j in range(i):
+                reconstructed += self.mu[i, j] * self.b_hat[j]
+            
+            if not np.allclose(self.basis[i], reconstructed, atol=tol):
+                self.logger.debug(f"GSO formula failed for basis[{i}]")
+                return False
+        
+        self.logger.debug("GSO verification passed")
+        return True
+
+    def verify_dual(self, tol=1e-10):
+        """Verify that b_bar is the dual of basis: <b_bar[i], basis[j]> = δ_ij"""
+        for i in range(self.n_basis):
+            for j in range(self.n_basis):
+                dot_product = np.dot(self.b_bar[i], self.basis[j])
+                expected = 1.0 if i == j else 0.0
+                if abs(dot_product - expected) > tol:
+                    self.logger.debug(f"Dual property failed: <b_bar[{i}], basis[{j}]> = {dot_product}, expected {expected}")
+                    return False
+        
+        self.logger.debug("Dual verification passed")
+        return True
 
     def enumerate(self):
         sols = []
@@ -260,9 +273,9 @@ class MarketSplit:
         
         return sols
 
-def ms_run(A, d, instance_id, opt_sol=None):
+def ms_run(A, d, instance_id, opt_sol=None, debug=False):
     try:
-        ms = MarketSplit(A, d)
+        ms = MarketSplit(A, d, debug=debug)
         solutions = ms.enumerate()
         
         found_opt = False
@@ -294,5 +307,5 @@ if __name__ == "__main__":
     instance_id = "ms_03_050_009"
     inst = ms_data.get(id=instance_id)
     A, d = inst['A'], inst['d']
-    res = ms_run(A, d, instance_id)
+    res = ms_run(A, d, instance_id, debug=True)
     print(res)
