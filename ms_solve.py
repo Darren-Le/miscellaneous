@@ -14,10 +14,12 @@ class MarketSplit:
 
         self.rmax = None
         self.c = None
-        self.basis = None  # Store as row vector
-        self.b_hat = None  # Store as row vector
-        self.b_bar = None  # Store as row vector
-        self.mu = None
+        self._basis = None  # Store as row vector
+        self._b_hat = None  # Store as row vector
+        self._b_bar = None  # Store as row vector
+        self._b_hat_norms_sq = None
+        self._b_bar_norms = None
+        self._mu = None
 
         # coords[i] is the coordinates of basis[i]: self.L @ coords[i].T = basis[i].T
         # it is a solution of the homogenous system: (A, -d) @ coords[i].T = 0
@@ -29,6 +31,39 @@ class MarketSplit:
         self._get_gso()
         self._compute_dual_norms()
         self._get_coordinates()
+        
+        # Make arrays read-only
+        self._basis.flags.writeable = False
+        self._b_hat.flags.writeable = False
+        self._b_hat_norms_sq.flags.writeable = False
+        self._b_bar.flags.writeable = False
+        self._mu.flags.writeable = False
+        
+        self.verify_gso()
+
+    @property
+    def basis(self):
+        return self._basis
+
+    @property  
+    def b_hat(self):
+        return self._b_hat
+
+    @property
+    def b_hat_norms_sq(self):
+        return self._b_hat_norms_sq
+
+    @property
+    def b_bar(self):
+        return self._b_bar
+
+    @property
+    def b_bar_norms(self):
+        return self._b_bar_norms
+
+    @property
+    def mu(self):
+        return self._mu
     
     def _compute_lcm(self, nums):
         def __lcm(a, b):
@@ -71,49 +106,72 @@ class MarketSplit:
                 col = L_reduced[j, self.m:]
                 b.append(col)
         assert(len(b) == self.n - self.m + 1)
-        self.basis = np.array(b)
+        self._basis = np.array(b)
 
     
     def _get_gso(self):
-        assert(self.basis.shape[0] == self.n_basis)
-        assert(self.basis.shape[1] == self.n + 1)
+        assert(self._basis.shape[0] == self.n_basis)
+        assert(self._basis.shape[1] == self.n + 1)
         
-        B_T = IntegerMatrix.from_matrix(self.basis.T.tolist())
+        B_T = IntegerMatrix.from_matrix(self._basis.T.tolist())
         M = GSO.Mat(B_T)
         M.update_gso()
         
         # Extract mu coefficients
-        self.mu = np.zeros((self.n_basis, self.n_basis))
+        self._mu = np.zeros((self.n_basis, self.n_basis))
         for i in range(self.n_basis):
-            self.mu[i, i] = 1.0
+            self._mu[i, i] = 1.0
             for j in range(i):
-                self.mu[i, j] = M.get_mu(i, j)
-        
-        # Extract squared norms
-        self.b_hat_norms_sq = np.zeros(self.n_basis)
-        for i in range(self.n_basis):
-            self.b_hat_norms_sq[i] = M.get_r(i, i)
+                self._mu[i, j] = M.get_mu(i, j)
         
         # Compute orthogonal vectors
-        self.b_hat = []
+        b_hat_list = []
         for i in range(self.n_basis):
-            b_hat_i = self.basis[i].astype(float)
+            b_hat_i = self._basis[i].astype(float)
             for j in range(i):
-                b_hat_i = b_hat_i - self.mu[i, j] * self.b_hat[j]
-            self.b_hat.append(b_hat_i)
+                b_hat_i = b_hat_i - self.mu[i, j] * b_hat_list[j]
+            b_hat_list.append(b_hat_i)
         
-        self.b_hat = np.array(self.b_hat)
+        self._b_hat = np.array(b_hat_list)
+
+        # Extract squared norms
+        self._b_hat_norms_sq = np.zeros(self.n_basis)
+        for i in range(self.n_basis):
+            self._b_hat_norms_sq[i] = np.dot(self._b_hat[i], self._b_hat[i])
+
+    def verify_gso(self, tol=1e-10):
+        """Verify that b_hat is the correct GSO of basis"""
+        # Check orthogonality
+        for i in range(self.n_basis):
+            for j in range(i + 1, self.n_basis):
+                dot_product = np.dot(self.b_hat[i], self.b_hat[j])
+                if abs(dot_product) > tol:
+                    print(f"Orthogonality failed: b_hat[{i}] · b_hat[{j}] = {dot_product}")
+                    return False
+        
+        # Check GSO formula: basis[i] = b_hat[i] + sum(mu[i,j] * b_hat[j] for j < i)
+        for i in range(self.n_basis):
+            reconstructed = self.b_hat[i].copy()
+            for j in range(i):
+                reconstructed += self.mu[i, j] * self.b_hat[j]
+            
+            if not np.allclose(self.basis[i], reconstructed, atol=tol):
+                print(f"GSO formula failed for basis[{i}]")
+                return False
+        
+        print("GSO verification passed")
+        return True
 
     def _compute_dual_norms(self):
-        B = self.basis.T
-        B_T = self.basis
+        B = self._basis.T
+        B_T = self._basis
         gram = B_T @ B
         gram_inv = np.linalg.inv(gram)
-        self.b_bar = (B @ gram_inv).T
+        self._b_bar = (B @ gram_inv).T
         
-        self.b_bar_norms = {
-            'l2': np.array([np.linalg.norm(self.b_bar[i, :], ord=2) for i in range(self.n_basis)]),
-            'l1': np.array([np.linalg.norm(self.b_bar[i, :], ord=1) for i in range(self.n_basis)])
+        self._b_bar_norms = {
+            'l2': np.array([np.linalg.norm(self._b_bar[i, :], ord=2) for i in range(self.n_basis)]),
+            'l1': np.array([np.linalg.norm(self._b_bar[i, :], ord=1) for i in range(self.n_basis)])
         }
     
     def _get_coordinates(self):
@@ -182,8 +240,14 @@ class MarketSplit:
                 # 计算 w^(idx) = (u_val + mu_sum) * b_hat[idx] + prev_w
                 coeff = u_val + mu_sum
                 curr_w = coeff * self.b_hat[idx] + prev_w
+                assert(np.dot(curr_w, curr_w) <= c)
                 
                 backtrack(idx - 1, u_values, curr_w)
+        
+        # Start backtracking
+        u_values = np.zeros(self.n_basis, dtype=int)
+        initial_w = np.zeros(self.n + 1)
+        backtrack(self.n_basis - 1, u_values, initial_w)
         
         return sols
 
@@ -217,16 +281,9 @@ if __name__ == "__main__":
     data_path = "path/to/data"
     sol_path = "path/to/solutions"
     ms_data = MSData(data_path, sol_path)
-    
-    instances = ms_data.get(m=3)
-    print(f"Testing {len(instances)} instances with m = 3")
-    
-    for inst in instances:
-        A, d = inst['A'], inst['d']
-        opt_sol = ms_data.get_solution(inst['id'])
-        
-        result = ms_run(A, d, inst['id'], opt_sol)
-        
-        status = "✓" if result['success'] else "✗"
-        opt_status = "✓" if result['optimal_found'] else "✗"
-        print(f"{status} {result['id']}: {result['solutions_count']} solutions, optimal: {opt_status}")
+
+    instance_id = "ms_03_050_009"
+    inst = ms_data.get(id=instance_id)
+    A, d = inst['A'], inst['d']
+    res = ms_run(A, d, instance_id)
+    print(res)
