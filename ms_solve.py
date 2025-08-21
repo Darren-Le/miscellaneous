@@ -296,16 +296,12 @@ class MarketSplit:
                 w_norm_sq = np.dot(curr_w, curr_w)
                 w_norm_l1 = np.linalg.norm(curr_w, ord=1)
                 
-                if w_norm_sq > self.rmax * w_norm_l1:
+                if w_norm_sq > self.rmax * w_norm_l1 + 1e-10:
                     # 如果当前w不满足条件，跳过所有满足 coeff * r > 0 的 u + r
                     if coeff > 0:
                         # 跳过所有 u_val + r (r > 0)，即跳过剩余的循环
                         break
-                    elif coeff < 0:
-                        # 跳过所有 u_val + r (r < 0)，由于我们从小到大枚举，
-                        # 这意味着继续循环直到 coeff >= 0
-                        continue
-                    # 如果 coeff == 0，只跳过当前值
+                    # 如果 coeff <= 0，只跳过当前值
                     continue
                 
                 backtrack(idx - 1, u_values, curr_w)
