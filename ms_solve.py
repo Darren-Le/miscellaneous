@@ -218,8 +218,12 @@ if __name__ == "__main__":
         print("\nRunning enumeration...")
         solutions = ms.enumerate()
         print(f"Found {len(solutions)} solutions")
-        for sol in solutions:
-            print(sol)
-        
+
+        opt_sol = ms_data.get_solution(instance_id)
+        if opt_sol is not None:
+            found_opt = any(np.array_equal(sol, opt_sol) for sol in solutions)
+            print(f"Optimal solution found: {found_opt}")
+            print(f"Optimal solution is: {opt_sol}")
+
     except Exception as e:
         print(f"Error creating MarketSplit instance: {e}")
