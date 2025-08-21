@@ -109,8 +109,13 @@ class MSData:
             'per_size': {size: len(self.by_size[size]) for size in sizes}
         }
     
-    def column_filter(self, instance_id):
-        """Filter A matrix columns based on optimal solution (keep only columns where opt_sol == 1)"""
+    def column_filter(self, instance_id, additional_cols=0):
+        """Filter A matrix columns based on optimal solution (keep only columns where opt_sol == 1)
+        
+        Args:
+            instance_id: ID of the instance
+            additional_cols: Number of additional filtered-out columns to keep (in original order)
+        """
         inst = self.get(id=instance_id)
         if inst is None:
             return None
@@ -119,9 +124,22 @@ class MSData:
         if opt_sol is None:
             return None
         
-        # Keep only columns where optimal solution is 1
-        mask = opt_sol == 1
-        filtered_A = inst['A'][:, mask]
+        # Columns to keep (where optimal solution is 1)
+        keep_mask = opt_sol == 1
+        keep_indices = np.where(keep_mask)[0]
+        
+        # Columns that were filtered out (where optimal solution is 0)
+        filtered_indices = np.where(~keep_mask)[0]
+        
+        # Add back the first additional_cols from filtered columns
+        if additional_cols > 0:
+            additional_indices = filtered_indices[:additional_cols]
+            final_indices = np.concatenate([keep_indices, additional_indices])
+            final_indices = np.sort(final_indices)  # Maintain original order
+        else:
+            final_indices = keep_indices
+        
+        filtered_A = inst['A'][:, final_indices]
         
         return filtered_A
     
@@ -170,6 +188,11 @@ if __name__ == "__main__":
         print(f"Matrix shape: {A.shape}, Vector shape: {d.shape}")
 
     # Test column filter
-    filtered_A = ms_data.column_filter("ms_03_050_009")
+    filtered_A = ms.column_filter("ms_03_050_009")
+    filtered_A_plus1 = ms.column_filter("ms_03_050_009", additional_cols=1)
+    filtered_A_plus2 = ms.column_filter("ms_03_050_009", additional_cols=2)
     if filtered_A is not None:
-        print(f"Original A shape: {inst['A'].shape}, Filtered A shape: {filtered_A.shape}")
+        print(f"Original A shape: {inst['A'].shape}")
+        print(f"Filtered A shape: {filtered_A.shape}")
+        print(f"Filtered A + 1 cols: {filtered_A_plus1}")
+        print(f"Filtered A + 2 cols: {filtered_A_plus2}")
