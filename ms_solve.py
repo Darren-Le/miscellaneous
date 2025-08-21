@@ -113,30 +113,26 @@ class MarketSplit:
         assert(self._basis.shape[0] == self.n_basis)
         assert(self._basis.shape[1] == self.n + 1)
         
-        B_T = IntegerMatrix.from_matrix(self._basis.T.tolist())
-        M = GSO.Mat(B_T)
-        M.update_gso()
+        # Manual Gram-Schmidt orthogonalization
+        self._b_hat = np.zeros((self.n_basis, self.n + 1), dtype=float)
+        self._mu = np.zeros((self.n_basis, self.n_basis), dtype=float)
+        self._b_hat_norms_sq = np.zeros(self.n_basis, dtype=float)
         
-        # Extract mu coefficients
-        self._mu = np.zeros((self.n_basis, self.n_basis))
         for i in range(self.n_basis):
+            # Start with the original basis vector
+            self._b_hat[i] = self._basis[i].astype(float)
+            
+            # Subtract projections onto previous orthogonal vectors
+            for j in range(i):
+                # mu[i,j] = <basis[i], b_hat[j]> / ||b_hat[j]||²
+                self._mu[i, j] = np.dot(self._basis[i], self._b_hat[j]) / self._b_hat_norms_sq[j]
+                # Subtract projection
+                self._b_hat[i] -= self._mu[i, j] * self._b_hat[j]
+            
+            # Set diagonal mu to 1
             self._mu[i, i] = 1.0
-            for j in range(i):
-                self._mu[i, j] = M.get_mu(i, j)
-        
-        # Compute orthogonal vectors
-        b_hat_list = []
-        for i in range(self.n_basis):
-            b_hat_i = self._basis[i].astype(float)
-            for j in range(i):
-                b_hat_i = b_hat_i - self.mu[i, j] * b_hat_list[j]
-            b_hat_list.append(b_hat_i)
-        
-        self._b_hat = np.array(b_hat_list)
-
-        # Extract squared norms
-        self._b_hat_norms_sq = np.zeros(self.n_basis)
-        for i in range(self.n_basis):
+            
+            # Compute squared norm
             self._b_hat_norms_sq[i] = np.dot(self._b_hat[i], self._b_hat[i])
 
     def verify_gso(self, tol=1e-10):
