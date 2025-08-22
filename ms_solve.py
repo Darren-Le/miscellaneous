@@ -369,8 +369,9 @@ def print_and_log(text, file_handle):
 
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Market Split Solver')
     parser.add_argument('--max_sols', type=int, default=-1, help='Maximum number of solutions to find (-1 for all)')
-    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--debug', action='store_true', help='Enable debug print')
     args = parser.parse_args()
 
     data_path = "ms_instance/01-marketsplit/instances"
