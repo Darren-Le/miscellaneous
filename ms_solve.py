@@ -4,6 +4,7 @@ from math import gcd
 from functools import reduce
 import logging
 import time
+from datetime import datetime
 from ms_data import MSData
 
 class MarketSplit:
@@ -361,6 +362,9 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'error': str(e)
         }
 
+def print_and_log(text, file_handle):
+    print(text)
+    file_handle.write(text + "\n")
 
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
@@ -392,19 +396,30 @@ if __name__ == "__main__":
                 f"1st_sol: {result['first_solution_time']:.4f}s")
         print()
 
-    # Results table
-    print("=" * 80)
-    print("RESULTS")
-    print("=" * 80)
+    # Results table - print and save simultaneously
+    m_choices = "_".join(map(str, test_m_values))
+    now = datetime.now()
+    time_str = f"{now.day}d{now.hour}h{now.minute}m{now.second}s"
+    log_filename = f"res_{m_choices}_{time_str}.log"
 
-    print(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}")
-    print("-" * 90)
 
-    for result in all_results:
-        inst = ms_data.get(id=result['id'])
-        m, n = inst['A'].shape
-        size = f"({m},{n})"
-        status = "SUCCESS" if result['success'] else "FAILED"
-        print(f"{result['id']:<15} {size:<8} {status:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}")
+    with open(log_filename, 'w') as f:
+        print_and_log("=" * 80, f)
+        print_and_log("RESULTS", f)
+        print_and_log("=" * 80, f)
+        print_and_log("", f)
+        
+        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
+        print_and_log("-" * 90, f)
+        
+        for result in all_results:
+            inst = ms_data.get(id=result['id'])
+            m, n = inst['A'].shape
+            size = f"({m},{n})"
+            status = "SUCCESS" if result['success'] else "FAILED"
+            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
+        
+        print_and_log("", f)
+        print_and_log("=" * 90, f)
 
-    print("\n" + "=" * 90)
+    print(f"Results saved to {log_filename}")
