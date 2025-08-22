@@ -123,7 +123,7 @@ class MarketSplit:
         L_lll = IntegerMatrix.from_matrix(self.L.T.tolist())
         # LLL.reduction(L_lll)
         # Use BKZ instead of LLL for shorter basis
-        BKZ.reduction(L_lll, BKZ.Param(block_size=min(20, ext_n//2))) 
+        BKZ.reduction(L_lll, BKZ.Param(block_size=min(30, ext_n//2))) 
         L_reduced = np.array(
             [[L_lll[i][j] for j in range(ext_m)] for i in range(ext_n)], dtype=int
         )
@@ -348,6 +348,7 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
         return {
             'id': instance_id,
             'solutions_count': len(solutions),
+            'solutions': solutions,
             'optimal_found': found_opt,
             'backtrack_loops': ms.backtrack_loops,
             'dive_loops': ms.dive_loops,
@@ -360,6 +361,7 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
         return {
             'id': instance_id,
             'solutions_count': 0,
+            'solutions': [],
             'optimal_found': False,
             'backtrack_loops': 0,
             'dive_loops': 0,
@@ -377,12 +379,14 @@ def print_and_log(text, file_handle):
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Market Split Solver')
+    parser.add_argument('--data_path', type=str, default="ms_instance/01-marketsplit/instances", help='Path to instance data')
+    parser.add_argument('--sol_path', type=str, default="ms_instance/01-marketsplit/solutions", help='Path to solution data')
     parser.add_argument('--max_sols', type=int, default=-1, help='Maximum number of solutions to find (-1 for all)')
     parser.add_argument('--debug', action='store_true', help='Enable debug print')
     args = parser.parse_args()
 
-    data_path = "ms_instance/01-marketsplit/instances"
-    sol_path = "ms_instance/01-marketsplit/solutions"
+    data_path = args.data_path
+    sol_path = args.sol_path
     ms_data = MSData(data_path, sol_path)
 
     debug_mode = args.debug
@@ -437,3 +441,16 @@ if __name__ == "__main__":
         print_and_log("=" * 108, f)
 
     print(f"Results saved to {log_filename}")
+
+    # Write solutions to file
+    sol_filename = log_filename.replace('.log', '.sol')
+    with open(sol_filename, 'w') as f:
+        for result in all_results:
+            if result['success'] and result['solutions']:
+                f.write(f"======={result['id']}=============\n")
+                for i, solution in enumerate(result['solutions'], 1):
+                    f.write(f"-----------{i}-th solution------------\n")
+                    f.write(' '.join(map(str, solution)) + '\n')
+                f.write('\n')
+
+    print(f"Solutions saved to {sol_filename}")
