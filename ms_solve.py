@@ -1,5 +1,5 @@
 import numpy as np
-from fpylll import IntegerMatrix, LLL
+from fpylll import IntegerMatrix, LLL, BKZ
 from math import gcd
 from functools import reduce
 import logging
@@ -121,7 +121,9 @@ class MarketSplit:
     def _get_reduced_basis(self):
         ext_m, ext_n = self.L.shape
         L_lll = IntegerMatrix.from_matrix(self.L.T.tolist())
-        LLL.reduction(L_lll)
+        # LLL.reduction(L_lll)
+        # Use BKZ instead of LLL for shorter basis
+        BKZ.reduction(L_lll, BKZ.Param(block_size=min(20, ext_n//2))) 
         L_reduced = np.array(
             [[L_lll[i][j] for j in range(ext_m)] for i in range(ext_n)], dtype=int
         )
