@@ -332,7 +332,9 @@ class MarketSplit:
 def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
     try:
         start_time = time.time()
+        init_start = time.time()
         ms = MarketSplit(A, d, debug=debug, max_sols=max_sols)
+        init_time = time.time() - init_start
         solutions = ms.enumerate()
         solve_time = time.time() - start_time
         
@@ -348,6 +350,7 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'dive_loops': ms.dive_loops,
             'solve_time': solve_time,
             'first_solution_time': ms.first_solution_time or 0,
+            'init_time': init_time,
             'success': True
         }
     except Exception as e:
@@ -359,6 +362,7 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'dive_loops': 0,
             'solve_time': 0,
             'first_solution_time': 0,
+            'init_time': 0, 
             'success': False,
             'error': str(e)
         }
@@ -399,7 +403,7 @@ if __name__ == "__main__":
             print(f"{status} {result['id']}: {result['solutions_count']} solutions, "
                 f"optimal: {opt_status}, bt_loops: {result['backtrack_loops']}, "
                 f"dive_loops: {result['dive_loops']}, time: {result['solve_time']:.4f}s, "
-                f"1st_sol: {result['first_solution_time']:.4f}s")
+                f"1st_sol: {result['first_solution_time']:.4f}s, init: {result['init_time']:.4f}s")
         print()
 
     # Results table - print and save simultaneously
@@ -415,8 +419,8 @@ if __name__ == "__main__":
         print_and_log("=" * 80, f)
         print_and_log("", f)
         
-        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
-        print_and_log("-" * 98, f)
+        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'Init(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
+        print_and_log("-" * 108, f)
 
         for result in all_results:
             inst = ms_data.get(id=result['id'])
@@ -424,9 +428,9 @@ if __name__ == "__main__":
             size = f"({m},{n})"
             status = "SUCCESS" if result['success'] else "FAILED"
             optimal = "✓" if result['optimal_found'] else "✗"
-            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)      
+            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
 
         print_and_log("", f)
-        print_and_log("=" * 90, f)
-
+        print_and_log("=" * 108, f)
+        
     print(f"Results saved to {log_filename}")
