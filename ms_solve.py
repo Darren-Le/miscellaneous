@@ -229,7 +229,7 @@ class MarketSplit:
         # 取最紧界
         u_global_bounds = np.minimum(u_bounds_l2, u_bounds_l1)
 
-        def backtrack(idx, u_values, prev_w):
+        def backtrack(idx, u_values, prev_w, prev_w_norm_sq):
             """
             回溯算法
             idx: 当前要确定的 u 的索引 (从 n_basis-1 递减到 0)
@@ -270,7 +270,7 @@ class MarketSplit:
                 return False
             
             # 第一个剪枝条件：检查 ||w^(idx+1)||_2^2 是否已经超过界限
-            prev_w_norm_sq = np.dot(prev_w, prev_w)
+            # prev_w_norm_sq = np.dot(prev_w, prev_w)
             if prev_w_norm_sq > c:
                 self.dive_loops += 1
                 return False # 剪枝
@@ -306,7 +306,8 @@ class MarketSplit:
                 curr_w = coeff * self.b_hat[idx] + prev_w
                 
                 # 第三个剪枝条件：检查 ||w||_2^2 <= rmax * ||w||_1
-                w_norm_sq = np.dot(curr_w, curr_w)
+                # ||w||_2^2 = coeff^2 * ||b_hat[idx]||_2^2 + ||prev_w||_2^2  
+                w_norm_sq = coeff * coeff * self.b_hat_norms_sq[idx] + prev_w_norm_sq
                 w_norm_l1 = np.linalg.norm(curr_w, ord=1)
                 
                 if w_norm_sq > self.rmax * w_norm_l1 + 1e-10:
@@ -317,7 +318,7 @@ class MarketSplit:
                     # 如果 coeff <= 0，只跳过当前值
                     continue
                 
-                if backtrack(idx - 1, u_values, curr_w):
+                if backtrack(idx - 1, u_values, curr_w, w_norm_sq):
                     return True
             
             return False
@@ -325,7 +326,7 @@ class MarketSplit:
         # 开始回溯
         u_values = np.zeros(self.n_basis, dtype=int)
         initial_w = np.zeros(self.n + 1)
-        backtrack(self.n_basis - 1, u_values, initial_w)
+        backtrack(self.n_basis - 1, u_values, initial_w, 0.0)
         
         return sols
 
@@ -432,5 +433,5 @@ if __name__ == "__main__":
 
         print_and_log("", f)
         print_and_log("=" * 108, f)
-        
+
     print(f"Results saved to {log_filename}")
