@@ -5,6 +5,7 @@ from functools import reduce
 import logging
 import time
 from datetime import datetime
+import argparse
 from ms_data import MSData
 
 class MarketSplit:
@@ -368,12 +369,16 @@ def print_and_log(text, file_handle):
 
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
+    parser.add_argument('--max_sols', type=int, default=-1, help='Maximum number of solutions to find (-1 for all)')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    args = parser.parse_args()
+
     data_path = "ms_instance/01-marketsplit/instances"
     sol_path = "ms_instance/01-marketsplit/solutions"
     ms_data = MSData(data_path, sol_path)
 
-    debug_mode = False
-    max_sols = -1
+    debug_mode = args.debug
+    max_sols = args.max_sols
     test_m_values = [3, 4, 5]
     all_results = []
 
@@ -419,7 +424,7 @@ if __name__ == "__main__":
             status = "SUCCESS" if result['success'] else "FAILED"
             optimal = "✓" if result['optimal_found'] else "✗"
             print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)      
-            
+
         print_and_log("", f)
         print_and_log("=" * 90, f)
 
