@@ -28,10 +28,13 @@ class MarketSplit:
         self.r = r if r else np.ones(self.n, dtype=int)
 
         self.backtrack_loops = 0
+        self.first_sol_bt_loops = 0
         self.dive_loops = 0
         self.first_solution_time = None
         self.max_sols = max_sols  # -1 means find all solutions
 
+        self.second_pruning_effect_count = 0
+        
         self.rmax = None
         self.c = None
         self._basis = None  # Store as row vector
@@ -263,6 +266,7 @@ class MarketSplit:
                             # Track first solution time
                             if self.first_solution_time is None:
                                 self.first_solution_time = time.time() - start_time
+                                self.first_sol_bt_loops = self.backtrack_loops
                             
                             sols.append(x.copy())
 
@@ -273,7 +277,7 @@ class MarketSplit:
             
             # 第一个剪枝条件：检查 ||w^(idx+1)||_2^2 是否已经超过界限
             # prev_w_norm_sq = np.dot(prev_w, prev_w)
-            if prev_w_norm_sq > c:
+            if prev_w_norm_sq > c + 1e-10:
                 self.dive_loops += 1
                 return False # 剪枝
             
@@ -298,6 +302,13 @@ class MarketSplit:
             # 取两个界的交集
             u_min = max(u_min_pruning1, u_min_pruning2)
             u_max = min(u_max_pruning1, u_max_pruning2)
+            
+            # 检查第二个剪枝策略是否生效
+            original_range = u_max_pruning1 - u_min_pruning1 + 1
+            final_range = max(0, u_max - u_min + 1)
+
+            if final_range < original_range:
+                self.second_pruning_effect_count += 1
             
             # 第三个剪枝策略：使用定理2进行剪枝
             for u_val in range(u_min, u_max + 1):
@@ -351,7 +362,9 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'solutions': solutions,
             'optimal_found': found_opt,
             'backtrack_loops': ms.backtrack_loops,
+            'first_sol_bt_loops': ms.first_sol_bt_loops,
             'dive_loops': ms.dive_loops,
+            'second_pruning_effect_count': ms.second_pruning_effect_count,
             'solve_time': solve_time,
             'first_solution_time': ms.first_solution_time or 0,
             'init_time': init_time,
@@ -364,7 +377,9 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'solutions': [],
             'optimal_found': False,
             'backtrack_loops': 0,
+            'first_sol_bt_loops': 0,
             'dive_loops': 0,
+            'second_pruning_effect_count': 0,
             'solve_time': 0,
             'first_solution_time': 0,
             'init_time': 0, 
@@ -409,8 +424,10 @@ if __name__ == "__main__":
             # Dynamic printing
             print(f"{status} {result['id']}: {result['solutions_count']} solutions, "
                 f"optimal: {opt_status}, bt_loops: {result['backtrack_loops']}, "
-                f"dive_loops: {result['dive_loops']}, time: {result['solve_time']:.4f}s, "
-                f"1st_sol: {result['first_solution_time']:.4f}s, init: {result['init_time']:.4f}s")
+                f"dive_loops: {result['dive_loops']}, 2nd_prune: {result['second_pruning_effect_count']}, "
+                f"time: {result['solve_time']:.4f}s, "
+                f"1st_sol: {result['first_solution_time']:.4f}s, 1st_bt: {result['first_sol_bt_loops']}, "
+                f"init: {result['init_time']:.4f}s")
         print()
 
     # Results table - print and save simultaneously
@@ -421,13 +438,13 @@ if __name__ == "__main__":
 
 
     with open(log_filename, 'w') as f:
-        print_and_log("=" * 80, f)
+        print_and_log("=" * 126, f)
         print_and_log("RESULTS", f)
-        print_and_log("=" * 80, f)
+        print_and_log("=" * 126, f)
         print_and_log("", f)
         
-        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'Init(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
-        print_and_log("-" * 108, f)
+        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'1st_BT':<8} {'2nd_Prune':<10} {'Init(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
+        print_and_log("-" * 126, f)
 
         for result in all_results:
             inst = ms_data.get(id=result['id'])
@@ -435,10 +452,10 @@ if __name__ == "__main__":
             size = f"({m},{n})"
             status = "SUCCESS" if result['success'] else "FAILED"
             optimal = "✓" if result['optimal_found'] else "✗"
-            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
+            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['first_sol_bt_loops']:<8} {result['second_pruning_effect_count']:<10} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
 
         print_and_log("", f)
-        print_and_log("=" * 108, f)
+        print_and_log("=" * 126, f)
 
     print(f"Results saved to {log_filename}")
 
