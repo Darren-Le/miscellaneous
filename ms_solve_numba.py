@@ -1,10 +1,12 @@
 import numpy as np
 from numba import njit
-import time
 from fpylll import IntegerMatrix, LLL, BKZ
 from math import gcd
 from functools import reduce
 import logging
+import time
+from datetime import datetime
+import argparse
 from ms_data import MSData
 
 # Numba-optimized helper functions
@@ -14,14 +16,6 @@ def compute_l1_norm(arr):
     result = 0.0
     for i in range(len(arr)):
         result += abs(arr[i])
-    return result
-
-@njit(fastmath=True)
-def compute_l2_norm_sq(arr):
-    """Compute L2 norm squared manually for Numba compatibility"""
-    result = 0.0
-    for i in range(len(arr)):
-        result += arr[i] * arr[i]
     return result
 
 @njit(fastmath=True)
@@ -72,7 +66,7 @@ def enumerate_solutions_iterative(basis, b_hat, b_hat_norms_sq, mu,
                                  u_global_bounds, A, d, c, rmax, 
                                  max_sols, n_basis, n, m):
     """
-    Iterative enumeration to avoid recursion depth issues
+    Iterative enumeration to avoid recursion issues with Numba
     Uses explicit stack to simulate recursion
     """
     # Constants
@@ -101,7 +95,7 @@ def enumerate_solutions_iterative(basis, b_hat, b_hat_norms_sq, mu,
     
     # Explicit stack for iterative implementation
     # Stack entry: [idx, u_min, u_max, u_current, mu_sum, w_norm_sq_at_level]
-    max_stack_size = n_basis * 1000  # Should be enough
+    max_stack_size = n_basis * 1000  # Should be enough for most problems
     stack = np.zeros((max_stack_size, 6), dtype=np.float64)
     stack_ptr = 0
     
@@ -202,7 +196,9 @@ def enumerate_solutions_iterative(basis, b_hat, b_hat_norms_sq, mu,
         vector_copy_inplace(curr_w, prev_w)
         vector_add_scaled_inplace(curr_w, b_hat[idx], coeff)
         
-        curr_w_norm_sq = compute_l2_norm_sq(curr_w)
+        curr_w_norm_sq = 0.0
+        for i in range(len(curr_w)):
+            curr_w_norm_sq += curr_w[i] * curr_w[i]
         
         # First pruning condition
         if curr_w_norm_sq > c_val + 1e-10:
@@ -255,9 +251,9 @@ def enumerate_solutions_iterative(basis, b_hat, b_hat_norms_sq, mu,
                                            first_pruning_effect_count, second_pruning_effect_count,
                                            third_pruning_effect_count)
 
-class MarketSplitNumbaFixed:
+class MarketSplit:
     def __init__(self, A, d, r=None, max_sols=-1, debug=False):
-        # Set up logger (same as original)
+        # Set up logger
         self.logger = logging.getLogger(__name__)
         if debug:
             self.logger.setLevel(logging.DEBUG)
@@ -278,22 +274,24 @@ class MarketSplitNumbaFixed:
         self.first_sol_bt_loops = 0
         self.dive_loops = 0
         self.first_solution_time = None
-        self.max_sols = max_sols
+        self.max_sols = max_sols  # -1 means find all solutions
         
         self.first_pruning_effect_count = 0 
         self.second_pruning_effect_count = 0
         self.third_pruning_effect_count = 0 
         
-        # Same preprocessing as original
         self.rmax = None
         self.c = None
-        self._basis = None
-        self._b_hat = None
-        self._b_bar = None
+        self._basis = None  # Store as row vector
+        self._b_hat = None  # Store as row vector
+        self._b_bar = None  # Store as row vector
         self._b_hat_norms_sq = None
         self._b_bar_norms = None
         self._mu = None
-        self._coords = None
+
+        # coords[i] is the coordinates of basis[i]: self.L @ coords[i].T = basis[i].T
+        # it is a solution of the homogenous system: (A, -d) @ coords[i].T = 0
+        self._coords = None 
 
         # Run preprocessing
         self._get_extended_matrix()
@@ -313,7 +311,34 @@ class MarketSplitNumbaFixed:
         self.verify_gso()
         self.verify_dual()
 
-    # Keep all the preprocessing methods from original class (same as before)
+    @property
+    def basis(self):
+        return self._basis
+
+    @property  
+    def b_hat(self):
+        return self._b_hat
+
+    @property
+    def b_hat_norms_sq(self):
+        return self._b_hat_norms_sq
+
+    @property
+    def b_bar(self):
+        return self._b_bar
+
+    @property
+    def b_bar_norms(self):
+        return self._b_bar_norms
+
+    @property
+    def mu(self):
+        return self._mu
+    
+    @property
+    def coords(self):
+        return self._coords
+
     def _compute_lcm(self, nums):
         def __lcm(a, b):
             return abs(a * b) // gcd(a, b)
@@ -339,10 +364,13 @@ class MarketSplitNumbaFixed:
         # Middle diagonal block
         for i in range(self.n):
             self.L[self.m + i, 1 + i] = 2 * self.c[i]
+        
 
     def _get_reduced_basis(self):
         ext_m, ext_n = self.L.shape
         L_lll = IntegerMatrix.from_matrix(self.L.T.tolist())
+        # LLL.reduction(L_lll)
+        # Use BKZ instead of LLL for shorter basis
         BKZ.reduction(L_lll, BKZ.Param(block_size=min(30, ext_n//2))) 
         L_reduced = np.array(
             [[L_lll[i][j] for j in range(ext_m)] for i in range(ext_n)], dtype=int
@@ -354,8 +382,9 @@ class MarketSplitNumbaFixed:
                 col = L_reduced[j, self.m:]
                 b.append(col)
         assert(len(b) == self.n - self.m + 1)
-        self._basis = np.array(b, dtype=np.float64)  # Use float64 for Numba
+        self._basis = np.array(b, dtype=np.float64)  # Use float64 for Numba compatibility
 
+    
     def _get_gso(self):
         assert(self._basis.shape[0] == self.n_basis)
         assert(self._basis.shape[1] == self.n + 1)
@@ -381,7 +410,7 @@ class MarketSplitNumbaFixed:
             
             # Compute squared norm
             self._b_hat_norms_sq[i] = np.dot(self._b_hat[i], self._b_hat[i])
-
+        
     def _compute_dual_norms(self):
         B = self._basis.T
         B_T = self._basis
@@ -403,7 +432,8 @@ class MarketSplitNumbaFixed:
         self._coords = np.array(coordinates)
     
     def verify_gso(self, tol=1e-10):
-        """Same as original"""
+        """Verify that b_hat is the correct GSO of basis"""
+        # Check orthogonality
         for i in range(self.n_basis):
             for j in range(i + 1, self.n_basis):
                 dot_product = np.dot(self.b_hat[i], self.b_hat[j])
@@ -411,6 +441,7 @@ class MarketSplitNumbaFixed:
                     self.logger.debug(f"Orthogonality failed: b_hat[{i}] · b_hat[{j}] = {dot_product}")
                     return False
         
+        # Check GSO formula: basis[i] = b_hat[i] + sum(mu[i,j] * b_hat[j] for j < i)
         for i in range(self.n_basis):
             reconstructed = self.b_hat[i].copy()
             for j in range(i):
@@ -424,7 +455,7 @@ class MarketSplitNumbaFixed:
         return True
 
     def verify_dual(self, tol=1e-10):
-        """Same as original"""
+        """Verify that b_bar is the dual of basis: <b_bar[i], basis[j]> = δ_ij"""
         for i in range(self.n_basis):
             for j in range(self.n_basis):
                 dot_product = np.dot(self.b_bar[i], self.basis[j])
@@ -435,35 +466,6 @@ class MarketSplitNumbaFixed:
         
         self.logger.debug("Dual verification passed")
         return True
-
-    # Properties (same as original)
-    @property
-    def basis(self):
-        return self._basis
-    
-    @property  
-    def b_hat(self):
-        return self._b_hat
-    
-    @property
-    def b_hat_norms_sq(self):
-        return self._b_hat_norms_sq
-    
-    @property
-    def b_bar(self):
-        return self._b_bar
-    
-    @property
-    def b_bar_norms(self):
-        return self._b_bar_norms
-    
-    @property
-    def mu(self):
-        return self._mu
-    
-    @property
-    def coords(self):
-        return self._coords
 
     def enumerate(self):
         """Numba-optimized enumeration using iterative approach"""
@@ -499,12 +501,11 @@ class MarketSplitNumbaFixed:
         
         return solutions
 
-# Update the ms_run function to use fixed Numba version
-def ms_run_numba_fixed(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
+def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
     try:
         start_time = time.time()
         init_start = time.time()
-        ms = MarketSplitNumbaFixed(A, d, debug=debug, max_sols=max_sols)
+        ms = MarketSplit(A, d, debug=debug, max_sols=max_sols)
         init_time = time.time() - init_start
         solutions = ms.enumerate()
         solve_time = time.time() - start_time
@@ -548,34 +549,97 @@ def ms_run_numba_fixed(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False
             'error': str(e)
         }
 
-# Simple test
+def print_and_log(text, file_handle):
+    print(text)
+    file_handle.write(text + "\n")
+
+# 主函数部分 - 使用数据文件 (Same as original, now with Numba optimization)
 if __name__ == "__main__":
-    print("Testing fixed Numba Market Split solver...")
-    
-    # Test with a small synthetic problem first
-    print("Creating synthetic test case...")
-    A = np.array([[1, 1, 1], [2, 1, 3]], dtype=int)
-    d = np.array([2, 4], dtype=int)
-    
-    print(f"Testing synthetic case A=\n{A}\nd={d}")
-    
-    try:
-        start = time.time()
-        result = ms_run_numba_fixed(A, d, "test", max_sols=10, debug=False)
-        elapsed = time.time() - start
+    parser = argparse.ArgumentParser(description='Market Split Solver (Numba-Optimized)')
+    parser.add_argument('--data_path', type=str, default="ms_instance/01-marketsplit/instances", help='Path to instance data')
+    parser.add_argument('--sol_path', type=str, default="ms_instance/01-marketsplit/solutions", help='Path to solution data')
+    parser.add_argument('--max_sols', type=int, default=-1, help='Maximum number of solutions to find (-1 for all)')
+    parser.add_argument('--debug', action='store_true', help='Enable debug print')
+    args = parser.parse_args()
+
+    data_path = args.data_path
+    sol_path = args.sol_path
+    ms_data = MSData(data_path, sol_path)
+
+    debug_mode = args.debug
+    max_sols = args.max_sols
+    test_m_values = [3, 4, 5, 6, 7]
+    all_results = []
+
+    print("Market Split Solver (Numba-Optimized Version)")
+    print("=" * 50)
+    print("First run includes JIT compilation time...")
+    print()
+
+    for m in test_m_values:
+        instances = ms_data.get(m=m)
+        print(f"Testing {len(instances)} instances with m = {m}")
         
-        print(f"Result: {result['solutions_count']} solutions in {elapsed:.4f}s")
-        print(f"Success: {result['success']}")
-        if result['solutions']:
-            print(f"First solution: {result['solutions'][0]}")
+        for inst in instances:
+            A, d = inst['A'], inst['d']
+            opt_sol = ms_data.get_solution(inst['id'])
+            result = ms_run(A, d, inst['id'], opt_sol, max_sols, debug=debug_mode)
+            all_results.append(result)
             
-        # Verify first solution
-        if result['solutions']:
-            x = result['solutions'][0]
-            print(f"Verification: A @ x = {A @ x}, should equal d = {d}")
-            print(f"Valid: {np.array_equal(A @ x, d)}")
+            status = "✓" if result['success'] else "✗"
+            opt_status = "✓" if result['optimal_found'] else "✗"
+            # Dynamic printing
+            print(f"{status} {result['id']}: {result['solutions_count']} solutions, "
+                f"optimal: {opt_status}, bt_loops: {result['backtrack_loops']}, "
+                f"dive_loops: {result['dive_loops']}, 1st_prune: {result['first_pruning_effect_count']}, "
+                f"2nd_prune: {result['second_pruning_effect_count']}, 3rd_prune: {result['third_pruning_effect_count']}, "
+                f"time: {result['solve_time']:.4f}s, "
+                f"1st_sol: {result['first_solution_time']:.4f}s, 1st_bt: {result['first_sol_bt_loops']}, "
+                f"init: {result['init_time']:.4f}s")
+        print()
+
+    # Results table - print and save simultaneously
+    m_choices = "_".join(map(str, test_m_values))
+    now = datetime.now()
+    time_str = f"{now.day}d{now.hour}h{now.minute}m{now.second}s"
+    log_filename = f"res_numba_{m_choices}_{time_str}.log"
+
+
+    with open(log_filename, 'w') as f:
+        print_and_log("=" * 136, f)
+        print_and_log("RESULTS (NUMBA-OPTIMIZED)", f)
+        print_and_log("=" * 136, f)
+        print_and_log("", f)
+        
+        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'1st_Prune':<10} {'2nd_Prune':<10} {'3rd_Prune':<10} {'Init(s)':<10} {'Solutions':<10} {'1st_BT':<8} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
+        print_and_log("-" * 136, f)
+
+        for result in all_results:
+            inst = ms_data.get(id=result['id'])
+            m, n = inst['A'].shape
+            size = f"({m},{n})"
+            status = "SUCCESS" if result['success'] else "FAILED"
+            optimal = "✓" if result['optimal_found'] else "✗"
+            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['first_pruning_effect_count']:<10} {result['second_pruning_effect_count']:<10} {result['third_pruning_effect_count']:<10} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['first_sol_bt_loops']:<8} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
             
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+        print_and_log("", f)
+        print_and_log("=" * 136, f)
+
+    print(f"Results saved to {log_filename}")
+
+    # Write solutions to file
+    sol_filename = log_filename.replace('.log', '.sol')
+    with open(sol_filename, 'w') as f:
+        for result in all_results:
+            if result['success'] and result['solutions']:
+                f.write(f"======={result['id']}=============\n")
+                for i, solution in enumerate(result['solutions'], 1):
+                    f.write(f"-----------{i}-th solution------------\n")
+                    f.write(' '.join(map(str, solution)) + '\n')
+                f.write('\n')
+
+    print(f"Solutions saved to {sol_filename}")
+    print()
+    print("Numba optimization complete!")
+    print("Note: First run includes JIT compilation time.")
+    print("Subsequent runs of the same problem sizes will be faster.")
