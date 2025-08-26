@@ -443,7 +443,7 @@ if __name__ == "__main__":
         print_and_log("=" * 126, f)
         print_and_log("", f)
         
-        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'1st_BT':<8} {'2nd_Prune':<10} {'Init(s)':<10} {'Solutions':<10} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
+        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'2nd_Prune':<10} {'Init(s)':<10} {'Solutions':<10} {'1st_BT':<8} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
         print_and_log("-" * 126, f)
 
         for result in all_results:
@@ -452,8 +452,8 @@ if __name__ == "__main__":
             size = f"({m},{n})"
             status = "SUCCESS" if result['success'] else "FAILED"
             optimal = "✓" if result['optimal_found'] else "✗"
-            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['first_sol_bt_loops']:<8} {result['second_pruning_effect_count']:<10} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
-
+            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['second_pruning_effect_count']:<10} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['first_sol_bt_loops']:<8} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
+            
         print_and_log("", f)
         print_and_log("=" * 126, f)
 
