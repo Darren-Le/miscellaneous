@@ -15,13 +15,13 @@ LIB_DIR = -L$(FPLLL_DIR)/lib
 LIBS = -lfplll -lmpfr -lgmp -lm
 
 # Source files
-C_SOURCES = ms_data.c main.cpp
-CXX_SOURCES = ms_solve.c
+C_SOURCES = ms_data.c
+CXX_SOURCES = ms_solve.c main.cpp
 HEADERS = ms_data.h ms_solve.h
 
 # Object files
 C_OBJECTS = $(C_SOURCES:.c=.o)
-CXX_OBJECTS = $(CXX_SOURCES:.c=.o)
+CXX_OBJECTS = $(CXX_SOURCES:.c=.o) $(CXX_SOURCES:.cpp=.o)
 OBJECTS = $(C_OBJECTS) $(CXX_OBJECTS)
 
 # Target executable
@@ -41,6 +41,9 @@ $(TARGET): $(OBJECTS)
 # For ms_solve.c, compile as C++ due to fplll dependency
 ms_solve.o: ms_solve.c ms_solve.h ms_data.h
 	$(CXX) $(CXXFLAGS) $(INCLUDE_DIR) -c ms_solve.c -o ms_solve.o
+
+main.o: main.cpp $(HEADERS)
+	$(CXX) $(CXXFLAGS) $(INCLUDE_DIR) -c main.cpp -o main.o
 
 # Clean build artifacts
 clean:
