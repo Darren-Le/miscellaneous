@@ -32,8 +32,10 @@ class MarketSplit:
         self.dive_loops = 0
         self.first_solution_time = None
         self.max_sols = max_sols  # -1 means find all solutions
-
+        
+        self.first_pruning_effect_count = 0 
         self.second_pruning_effect_count = 0
+        self.third_pruning_effect_count = 0 
         
         self.rmax = None
         self.c = None
@@ -279,6 +281,7 @@ class MarketSplit:
             # prev_w_norm_sq = np.dot(prev_w, prev_w)
             if prev_w_norm_sq > c + 1e-10:
                 self.dive_loops += 1
+                self.first_pruning_effect_count += 1 
                 return False # 剪枝
             
             # 计算 sum_{i=idx+1}^{n_basis-1} u_i * mu_{i,idx}
@@ -327,8 +330,10 @@ class MarketSplit:
                     # 如果当前w不满足条件，跳过所有满足 coeff * r > 0 的 u + r
                     if coeff > 0:
                         # 跳过所有 u_val + r (r > 0)，即跳过剩余的循环
+                        self.third_pruning_effect_count += (u_max - u_val)
                         break
                     # 如果 coeff <= 0，只跳过当前值
+                    self.third_pruning_effect_count += 1
                     continue
                 
                 if backtrack(idx - 1, u_values, curr_w, w_norm_sq):
@@ -364,7 +369,9 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'backtrack_loops': ms.backtrack_loops,
             'first_sol_bt_loops': ms.first_sol_bt_loops,
             'dive_loops': ms.dive_loops,
+            'first_pruning_effect_count': ms.first_pruning_effect_count,  
             'second_pruning_effect_count': ms.second_pruning_effect_count,
+            'third_pruning_effect_count': ms.third_pruning_effect_count,  
             'solve_time': solve_time,
             'first_solution_time': ms.first_solution_time or 0,
             'init_time': init_time,
@@ -379,7 +386,9 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'backtrack_loops': 0,
             'first_sol_bt_loops': 0,
             'dive_loops': 0,
+            'first_pruning_effect_count': 0,
             'second_pruning_effect_count': 0,
+            'third_pruning_effect_count': 0,
             'solve_time': 0,
             'first_solution_time': 0,
             'init_time': 0, 
@@ -406,7 +415,7 @@ if __name__ == "__main__":
 
     debug_mode = args.debug
     max_sols = args.max_sols
-    test_m_values = [3, 4, 5]
+    test_m_values = [3, 4, 5, 6, 7]
     all_results = []
 
     for m in test_m_values:
@@ -424,7 +433,8 @@ if __name__ == "__main__":
             # Dynamic printing
             print(f"{status} {result['id']}: {result['solutions_count']} solutions, "
                 f"optimal: {opt_status}, bt_loops: {result['backtrack_loops']}, "
-                f"dive_loops: {result['dive_loops']}, 2nd_prune: {result['second_pruning_effect_count']}, "
+                f"dive_loops: {result['dive_loops']}, 1st_prune: {result['first_pruning_effect_count']}, "
+                f"2nd_prune: {result['second_pruning_effect_count']}, 3rd_prune: {result['third_pruning_effect_count']}, "
                 f"time: {result['solve_time']:.4f}s, "
                 f"1st_sol: {result['first_solution_time']:.4f}s, 1st_bt: {result['first_sol_bt_loops']}, "
                 f"init: {result['init_time']:.4f}s")
@@ -438,13 +448,13 @@ if __name__ == "__main__":
 
 
     with open(log_filename, 'w') as f:
-        print_and_log("=" * 126, f)
+        print_and_log("=" * 136, f)
         print_and_log("RESULTS", f)
-        print_and_log("=" * 126, f)
+        print_and_log("=" * 136, f)
         print_and_log("", f)
         
-        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'2nd_Prune':<10} {'Init(s)':<10} {'Solutions':<10} {'1st_BT':<8} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
-        print_and_log("-" * 126, f)
+        print_and_log(f"{'ID':<15} {'Size':<8} {'Status':<8} {'Optimal':<8} {'Time(s)':<10} {'1st_Sol(s)':<10} {'1st_Prune':<10} {'2nd_Prune':<10} {'3rd_Prune':<10} {'Init(s)':<10} {'Solutions':<10} {'1st_BT':<8} {'BT_Loops':<12} {'Dive_Loops':<12}", f)
+        print_and_log("-" * 136, f)
 
         for result in all_results:
             inst = ms_data.get(id=result['id'])
@@ -452,10 +462,10 @@ if __name__ == "__main__":
             size = f"({m},{n})"
             status = "SUCCESS" if result['success'] else "FAILED"
             optimal = "✓" if result['optimal_found'] else "✗"
-            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['second_pruning_effect_count']:<10} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['first_sol_bt_loops']:<8} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
+            print_and_log(f"{result['id']:<15} {size:<8} {status:<8} {optimal:<8} {result['solve_time']:<10.4f} {result['first_solution_time']:<10.4f} {result['first_pruning_effect_count']:<10} {result['second_pruning_effect_count']:<10} {result['third_pruning_effect_count']:<10} {result['init_time']:<10.4f} {result['solutions_count']:<10} {result['first_sol_bt_loops']:<8} {result['backtrack_loops']:<12} {result['dive_loops']:<12}", f)
             
         print_and_log("", f)
-        print_and_log("=" * 126, f)
+        print_and_log("=" * 136, f)
 
     print(f"Results saved to {log_filename}")
 
