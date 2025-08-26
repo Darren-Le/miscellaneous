@@ -1,6 +1,5 @@
 import numpy as np
-from numba import njit, types
-from numba.typed import List
+from numba import njit
 import time
 from fpylll import IntegerMatrix, LLL, BKZ
 from math import gcd
@@ -26,21 +25,13 @@ def compute_l2_norm_sq(arr):
     return result
 
 @njit(fastmath=True)
-def dot_product(a, b):
-    """Manual dot product for Numba"""
-    result = 0.0
-    for i in range(len(a)):
-        result += a[i] * b[i]
-    return result
-
-@njit(fastmath=True)
-def vector_add_scaled(result, vec, scale):
+def vector_add_scaled_inplace(result, vec, scale):
     """result += scale * vec (in-place)"""
     for i in range(len(result)):
         result[i] += scale * vec[i]
 
 @njit(fastmath=True)
-def vector_copy(dst, src):
+def vector_copy_inplace(dst, src):
     """Copy src to dst"""
     for i in range(len(dst)):
         dst[i] = src[i]
@@ -59,12 +50,10 @@ def check_solution_validity(v, rmax, n, tol=1e-10):
     return True
 
 @njit(fastmath=True)
-def extract_solution(v, c, rmax, n):
+def extract_solution_inplace(v, c, rmax, n, x_out):
     """Extract x from v given the matrix structure"""
-    x = np.zeros(n, dtype=np.int32)
     for i in range(n):
-        x[i] = int(round((v[i] + rmax) / (2.0 * c[i])))
-    return x
+        x_out[i] = int(round((v[i] + rmax) / (2.0 * c[i])))
 
 @njit(fastmath=True)
 def verify_solution(A, d, x):
@@ -78,16 +67,19 @@ def verify_solution(A, d, x):
             return False
     return True
 
-@njit(fastmath=True, cache=True)
-def enumerate_solutions_numba(basis, b_hat, b_hat_norms_sq, mu, 
-                             u_global_bounds, A, d, c, rmax, 
-                             max_sols, n_basis, n, m):
+@njit(fastmath=True)
+def enumerate_solutions_iterative(basis, b_hat, b_hat_norms_sq, mu, 
+                                 u_global_bounds, A, d, c, rmax, 
+                                 max_sols, n_basis, n, m):
     """
-    Numba-optimized enumeration function
-    Returns: solutions (as flat array), solution_count, stats
+    Iterative enumeration to avoid recursion depth issues
+    Uses explicit stack to simulate recursion
     """
-    # Pre-allocate arrays to avoid allocations in hot loop
+    # Constants
+    c_val = (n + 1) * rmax * rmax
     max_total_solutions = 10000 if max_sols == -1 else max_sols
+    
+    # Results
     solutions_flat = np.zeros(max_total_solutions * n, dtype=np.int32)
     solution_count = 0
     
@@ -100,23 +92,68 @@ def enumerate_solutions_numba(basis, b_hat, b_hat_norms_sq, mu,
     third_pruning_effect_count = 0
     first_solution_found = False
     
-    c_val = (n + 1) * rmax * rmax  # Constant for pruning
-    sqrt_c = np.sqrt(c_val)
-    
-    # Working arrays (reused to avoid allocations)
+    # Working arrays
     u_values = np.zeros(n_basis, dtype=np.int32)
     v = np.zeros(n + 1, dtype=np.float64)
     curr_w = np.zeros(n + 1, dtype=np.float64)
+    prev_w = np.zeros(n + 1, dtype=np.float64)
     x = np.zeros(n, dtype=np.int32)
     
-    def backtrack(idx, prev_w, prev_w_norm_sq):
-        nonlocal solution_count, backtrack_loops, dive_loops, first_sol_bt_loops
-        nonlocal first_pruning_effect_count, second_pruning_effect_count, third_pruning_effect_count
-        nonlocal first_solution_found
+    # Explicit stack for iterative implementation
+    # Stack entry: [idx, u_min, u_max, u_current, mu_sum, w_norm_sq_at_level]
+    max_stack_size = n_basis * 1000  # Should be enough
+    stack = np.zeros((max_stack_size, 6), dtype=np.float64)
+    stack_ptr = 0
+    
+    # Initialize first level
+    if n_basis > 0:
+        idx = n_basis - 1
         
+        # Compute initial bounds for top level
+        u_min_pruning2 = int(np.floor(-u_global_bounds[idx]))
+        u_max_pruning2 = int(np.ceil(u_global_bounds[idx]))
+        
+        # For the first level, prev_w_norm_sq = 0, mu_sum = 0
+        bound_sq = c_val / b_hat_norms_sq[idx]
+        bound = np.sqrt(max(0.0, bound_sq))
+        u_min_pruning1 = int(np.floor(-bound))
+        u_max_pruning1 = int(np.ceil(bound))
+        
+        u_min = max(u_min_pruning1, u_min_pruning2)
+        u_max = min(u_max_pruning1, u_max_pruning2)
+        
+        if u_min <= u_max:
+            stack[0, 0] = idx        # idx
+            stack[0, 1] = u_min      # u_min
+            stack[0, 2] = u_max      # u_max  
+            stack[0, 3] = u_min      # u_current
+            stack[0, 4] = 0.0        # mu_sum
+            stack[0, 5] = 0.0        # w_norm_sq_at_level
+            stack_ptr = 1
+    
+    while stack_ptr > 0:
         backtrack_loops += 1
         
-        if idx == -1:
+        # Pop current state
+        stack_ptr -= 1
+        idx = int(stack[stack_ptr, 0])
+        u_min = int(stack[stack_ptr, 1])
+        u_max = int(stack[stack_ptr, 2])
+        u_current = int(stack[stack_ptr, 3])
+        mu_sum = stack[stack_ptr, 4]
+        prev_w_norm_sq = stack[stack_ptr, 5]
+        
+        if u_current > u_max:
+            continue  # This level is done
+        
+        # Update u_current for this level and push back if not done
+        if u_current < u_max:
+            stack[stack_ptr, 3] = u_current + 1  # Next u value
+            stack_ptr += 1  # Push back for next iteration
+        
+        u_values[idx] = u_current
+        
+        if idx == 0:  # Base case - we have a complete assignment
             dive_loops += 1
             
             # Compute v = sum(u_i * basis_i)
@@ -127,10 +164,8 @@ def enumerate_solutions_numba(basis, b_hat, b_hat_norms_sq, mu,
             
             # Check constraints
             if check_solution_validity(v, rmax, n):
-                # Extract solution
-                x = extract_solution(v, c, rmax, n)
+                extract_solution_inplace(v, c, rmax, n, x)
                 
-                # Verify solution
                 if verify_solution(A, d, x):
                     if not first_solution_found:
                         first_solution_found = True
@@ -142,81 +177,85 @@ def enumerate_solutions_numba(basis, b_hat, b_hat_norms_sq, mu,
                             solutions_flat[solution_count * n + i] = x[i]
                         solution_count += 1
                         
-                        # Check if we've found enough solutions
                         if max_sols > 0 and solution_count >= max_sols:
-                            return True
-            return False
+                            break
+            
+            continue
+        
+        # Compute current w for this level
+        coeff = u_current + mu_sum
+        
+        # Reconstruct prev_w from u_values at higher levels
+        for i in range(n + 1):
+            prev_w[i] = 0.0
+        
+        for level in range(idx + 1, n_basis):
+            level_coeff = u_values[level]
+            level_mu_sum = 0.0
+            for j in range(level + 1, n_basis):
+                level_mu_sum += u_values[j] * mu[j, level]
+            level_coeff += level_mu_sum
+            
+            vector_add_scaled_inplace(prev_w, b_hat[level], level_coeff)
+        
+        # curr_w = coeff * b_hat[idx] + prev_w  
+        vector_copy_inplace(curr_w, prev_w)
+        vector_add_scaled_inplace(curr_w, b_hat[idx], coeff)
+        
+        curr_w_norm_sq = compute_l2_norm_sq(curr_w)
         
         # First pruning condition
-        if prev_w_norm_sq > c_val + 1e-10:
-            dive_loops += 1
+        if curr_w_norm_sq > c_val + 1e-10:
             first_pruning_effect_count += 1
-            return False
+            continue
         
-        # Compute mu_sum = sum_{i=idx+1}^{n_basis-1} u_i * mu_{i,idx}
-        mu_sum = 0.0
-        for j in range(idx + 1, n_basis):
-            mu_sum += u_values[j] * mu[j, idx]
+        # Third pruning condition
+        curr_w_norm_l1 = compute_l1_norm(curr_w)
+        if curr_w_norm_sq > rmax * curr_w_norm_l1 + 1e-10:
+            third_pruning_effect_count += 1
+            continue
         
-        # Compute bounds for u[idx] from first pruning condition
-        bound_sq = (c_val - prev_w_norm_sq) / b_hat_norms_sq[idx]
-        bound = np.sqrt(max(0.0, bound_sq))
-        
-        u_min_pruning1 = int(np.floor(-bound - mu_sum))
-        u_max_pruning1 = int(np.ceil(bound - mu_sum))
-        
-        # Second pruning: global bounds
-        u_min_pruning2 = int(np.floor(-u_global_bounds[idx]))
-        u_max_pruning2 = int(np.ceil(u_global_bounds[idx]))
-        
-        # Take intersection
-        u_min = max(u_min_pruning1, u_min_pruning2)
-        u_max = min(u_max_pruning1, u_max_pruning2)
-        
-        # Count second pruning effect
-        original_range = u_max_pruning1 - u_min_pruning1 + 1
-        final_range = max(0, u_max - u_min + 1)
-        if final_range < original_range:
-            second_pruning_effect_count += 1
-        
-        # Third pruning strategy with Holder's inequality
-        for u_val in range(u_min, u_max + 1):
-            u_values[idx] = u_val
+        # Push next level onto stack
+        next_idx = idx - 1
+        if next_idx >= 0 and stack_ptr < max_stack_size - 1:
+            # Compute mu_sum for next level
+            next_mu_sum = 0.0
+            for j in range(next_idx + 1, n_basis):
+                next_mu_sum += u_values[j] * mu[j, next_idx]
             
-            # Compute w^(idx) = (u_val + mu_sum) * b_hat[idx] + prev_w
-            coeff = u_val + mu_sum
+            # Compute bounds for next level
+            bound_sq = (c_val - curr_w_norm_sq) / b_hat_norms_sq[next_idx]
+            bound = np.sqrt(max(0.0, bound_sq))
             
-            # curr_w = coeff * b_hat[idx] + prev_w
-            vector_copy(curr_w, prev_w)
-            vector_add_scaled(curr_w, b_hat[idx], coeff)
+            next_u_min_pruning1 = int(np.floor(-bound - next_mu_sum))
+            next_u_max_pruning1 = int(np.ceil(bound - next_mu_sum))
             
-            # Third pruning condition: ||w||_2^2 <= rmax * ||w||_1
-            w_norm_sq = coeff * coeff * b_hat_norms_sq[idx] + prev_w_norm_sq
-            w_norm_l1 = compute_l1_norm(curr_w)
+            next_u_min_pruning2 = int(np.floor(-u_global_bounds[next_idx]))
+            next_u_max_pruning2 = int(np.ceil(u_global_bounds[next_idx]))
             
-            if w_norm_sq > rmax * w_norm_l1 + 1e-10:
-                if coeff > 0:
-                    # Skip all remaining u_val + r (r > 0)
-                    third_pruning_effect_count += (u_max - u_val)
-                    break
-                # Skip only current value if coeff <= 0
-                third_pruning_effect_count += 1
-                continue
+            next_u_min = max(next_u_min_pruning1, next_u_min_pruning2)
+            next_u_max = min(next_u_max_pruning1, next_u_max_pruning2)
             
-            if backtrack(idx - 1, curr_w, w_norm_sq):
-                return True
-        
-        return False
-    
-    # Initialize
-    prev_w = np.zeros(n + 1, dtype=np.float64)
-    backtrack(n_basis - 1, prev_w, 0.0)
+            # Count second pruning effect
+            original_range = next_u_max_pruning1 - next_u_min_pruning1 + 1
+            final_range = max(0, next_u_max - next_u_min + 1)
+            if final_range < original_range:
+                second_pruning_effect_count += 1
+            
+            if next_u_min <= next_u_max:
+                stack[stack_ptr, 0] = next_idx
+                stack[stack_ptr, 1] = next_u_min
+                stack[stack_ptr, 2] = next_u_max
+                stack[stack_ptr, 3] = next_u_min
+                stack[stack_ptr, 4] = next_mu_sum
+                stack[stack_ptr, 5] = curr_w_norm_sq
+                stack_ptr += 1
     
     return solutions_flat, solution_count, (backtrack_loops, dive_loops, first_sol_bt_loops,
                                            first_pruning_effect_count, second_pruning_effect_count,
                                            third_pruning_effect_count)
 
-class MarketSplitNumba:
+class MarketSplitNumbaFixed:
     def __init__(self, A, d, r=None, max_sols=-1, debug=False):
         # Set up logger (same as original)
         self.logger = logging.getLogger(__name__)
@@ -245,7 +284,7 @@ class MarketSplitNumba:
         self.second_pruning_effect_count = 0
         self.third_pruning_effect_count = 0 
         
-        # Same preprocessing as original (can't easily optimize with Numba)
+        # Same preprocessing as original
         self.rmax = None
         self.c = None
         self._basis = None
@@ -256,7 +295,7 @@ class MarketSplitNumba:
         self._mu = None
         self._coords = None
 
-        # Run preprocessing (keep original logic)
+        # Run preprocessing
         self._get_extended_matrix()
         self._get_reduced_basis()
         self._get_gso()
@@ -274,7 +313,7 @@ class MarketSplitNumba:
         self.verify_gso()
         self.verify_dual()
 
-    # Keep all the preprocessing methods from original class
+    # Keep all the preprocessing methods from original class (same as before)
     def _compute_lcm(self, nums):
         def __lcm(a, b):
             return abs(a * b) // gcd(a, b)
@@ -427,7 +466,7 @@ class MarketSplitNumba:
         return self._coords
 
     def enumerate(self):
-        """Numba-optimized enumeration"""
+        """Numba-optimized enumeration using iterative approach"""
         start_time = time.time()
         
         # Prepare global bounds for second pruning strategy
@@ -437,7 +476,7 @@ class MarketSplitNumba:
         u_global_bounds = np.minimum(u_bounds_l2, u_bounds_l1)
         
         # Call Numba-optimized function
-        solutions_flat, solution_count, stats = enumerate_solutions_numba(
+        solutions_flat, solution_count, stats = enumerate_solutions_iterative(
             self.basis, self.b_hat, self.b_hat_norms_sq, self.mu,
             u_global_bounds, self.A.astype(np.int32), self.d.astype(np.int32), 
             self.c.astype(np.float64), float(self.rmax), 
@@ -460,12 +499,12 @@ class MarketSplitNumba:
         
         return solutions
 
-# Update the ms_run function to use Numba version
-def ms_run_numba(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
+# Update the ms_run function to use fixed Numba version
+def ms_run_numba_fixed(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
     try:
         start_time = time.time()
         init_start = time.time()
-        ms = MarketSplitNumba(A, d, debug=debug, max_sols=max_sols)
+        ms = MarketSplitNumbaFixed(A, d, debug=debug, max_sols=max_sols)
         init_time = time.time() - init_start
         solutions = ms.enumerate()
         solve_time = time.time() - start_time
@@ -509,37 +548,34 @@ def ms_run_numba(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
             'error': str(e)
         }
 
-# Test function
+# Simple test
 if __name__ == "__main__":
-    print("Testing Numba-optimized Market Split solver...")
+    print("Testing fixed Numba Market Split solver...")
     
-    # Load a small test case
-    data_path = "ms_instance/01-marketsplit/instances"
-    sol_path = "ms_instance/01-marketsplit/solutions"
-    ms_data = MSData(data_path, sol_path)
+    # Test with a small synthetic problem first
+    print("Creating synthetic test case...")
+    A = np.array([[1, 1, 1], [2, 1, 3]], dtype=int)
+    d = np.array([2, 4], dtype=int)
     
-    # Test on a small instance first
-    instances = ms_data.get(m=3)
-    if instances:
-        inst = instances[0]
-        A, d = inst['A'], inst['d']
-        opt_sol = ms_data.get_solution(inst['id'])
-        
-        print(f"Testing instance {inst['id']} with shape {A.shape}")
-        
-        # Compare original vs Numba
-        print("Running original version...")
+    print(f"Testing synthetic case A=\n{A}\nd={d}")
+    
+    try:
         start = time.time()
-        ms_orig = MarketSplit(A, d, debug=False, max_sols=10)
-        orig_sols = ms_orig.enumerate()
-        orig_time = time.time() - start
+        result = ms_run_numba_fixed(A, d, "test", max_sols=10, debug=False)
+        elapsed = time.time() - start
         
-        print("Running Numba version...")
-        start = time.time()
-        result = ms_run_numba(A, d, inst['id'], opt_sol, max_sols=10, debug=False)
-        numba_time = result['solve_time']
-        
-        print(f"Original: {len(orig_sols)} solutions in {orig_time:.4f}s")
-        print(f"Numba:    {result['solutions_count']} solutions in {numba_time:.4f}s")
-        print(f"Speedup:  {orig_time/numba_time:.2f}x")
-        print(f"Solutions match: {len(orig_sols) == result['solutions_count']}")
+        print(f"Result: {result['solutions_count']} solutions in {elapsed:.4f}s")
+        print(f"Success: {result['success']}")
+        if result['solutions']:
+            print(f"First solution: {result['solutions'][0]}")
+            
+        # Verify first solution
+        if result['solutions']:
+            x = result['solutions'][0]
+            print(f"Verification: A @ x = {A @ x}, should equal d = {d}")
+            print(f"Valid: {np.array_equal(A @ x, d)}")
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()

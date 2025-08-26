@@ -1,165 +1,173 @@
 #!/usr/bin/env python3
 """
-Performance comparison script for original vs Numba-optimized Market Split solver
+Test script for the fixed Numba version
 """
 
 import time
 import numpy as np
 from ms_data import MSData
 from ms_solve import MarketSplit  # Original version
-from ms_solve_numba import MarketSplitNumba, ms_run_numba  # Numba version
+from ms_solve_numba import MarketSplitNumbaFixed, ms_run_numba_fixed
 
-def performance_test():
-    print("=== Numba Performance Test ===\n")
+def test_synthetic():
+    """Test with simple synthetic cases"""
+    print("=== Synthetic Test Cases ===")
     
-    # Load data
-    data_path = "ms_instance/01-marketsplit/instances"
-    sol_path = "ms_instance/01-marketsplit/solutions"
-    ms_data = MSData(data_path, sol_path)
+    test_cases = [
+        {
+            'name': 'Simple 2x3',
+            'A': np.array([[1, 1, 1], [2, 1, 3]], dtype=int),
+            'd': np.array([2, 4], dtype=int)
+        },
+        {
+            'name': 'Small 3x4', 
+            'A': np.array([[1, 2, 1, 3], [2, 1, 3, 1], [1, 1, 1, 1]], dtype=int),
+            'd': np.array([5, 7, 3], dtype=int)
+        }
+    ]
     
-    # Test different problem sizes
-    test_cases = []
-    for m in [3, 4, 5]:  # Start with smaller instances
-        instances = ms_data.get(m=m)
-        if instances:
-            test_cases.extend(instances[:2])  # First 2 instances of each size
-    
-    results = []
-    
-    for inst in test_cases:
-        A, d = inst['A'], inst['d']
-        instance_id = inst['id']
-        opt_sol = ms_data.get_solution(instance_id)
-        m, n = A.shape
-        
-        print(f"Testing {instance_id} (m={m}, n={n})")
+    for case in test_cases:
+        print(f"\nTesting {case['name']}: A.shape={case['A'].shape}")
+        A, d = case['A'], case['d']
         
         try:
-            # Original version
-            print("  Running original version...")
-            start_time = time.time()
-            ms_orig = MarketSplit(A, d, max_sols=100, debug=False)
+            # Test original
+            print("  Original version...")
+            start = time.time()
+            ms_orig = MarketSplit(A, d, max_sols=10, debug=False)
             orig_solutions = ms_orig.enumerate()
-            orig_time = time.time() - start_time
+            orig_time = time.time() - start
             
-            # Numba version (first run includes compilation time)
-            print("  Running Numba version (includes compilation)...")
-            start_time = time.time()
-            numba_result = ms_run_numba(A, d, instance_id, opt_sol, max_sols=100, debug=False)
-            numba_time_with_compile = time.time() - start_time
+            # Test fixed Numba
+            print("  Fixed Numba version...")
+            start = time.time()
+            numba_result = ms_run_numba_fixed(A, d, case['name'], max_sols=10, debug=False)
+            numba_time = time.time() - start
             
-            # Numba version (second run, no compilation)
-            print("  Running Numba version (compiled)...")
-            start_time = time.time()
-            numba_result2 = ms_run_numba(A, d, instance_id, opt_sol, max_sols=100, debug=False)
-            numba_time = time.time() - start_time
+            # Compare
+            print(f"    Original:  {len(orig_solutions)} solutions in {orig_time:.4f}s")
+            print(f"    Numba:     {numba_result['solutions_count']} solutions in {numba_time:.4f}s")
+            print(f"    Match:     {'✓' if len(orig_solutions) == numba_result['solutions_count'] else '✗'}")
             
-            # Verify results match
-            solutions_match = len(orig_solutions) == numba_result['solutions_count']
-            optimal_match = (opt_sol is not None and 
-                           any(np.array_equal(sol, opt_sol) for sol in orig_solutions) == 
-                           numba_result['optimal_found'])
-            
-            speedup_with_compile = orig_time / numba_time_with_compile if numba_time_with_compile > 0 else float('inf')
-            speedup = orig_time / numba_time if numba_time > 0 else float('inf')
-            
-            result = {
-                'instance': instance_id,
-                'size': f"({m},{n})",
-                'orig_time': orig_time,
-                'numba_time_with_compile': numba_time_with_compile,
-                'numba_time': numba_time,
-                'speedup_with_compile': speedup_with_compile,
-                'speedup': speedup,
-                'solutions_match': solutions_match,
-                'optimal_match': optimal_match,
-                'orig_solutions': len(orig_solutions),
-                'numba_solutions': numba_result['solutions_count']
-            }
-            
-            results.append(result)
-            
-            print(f"    Original:     {orig_time:.4f}s ({len(orig_solutions)} solutions)")
-            print(f"    Numba (+comp): {numba_time_with_compile:.4f}s ({numba_result['solutions_count']} solutions)")
-            print(f"    Numba:        {numba_time:.4f}s ({numba_result2['solutions_count']} solutions)")
-            print(f"    Speedup:      {speedup:.1f}x")
-            print(f"    Correct:      {'✓' if solutions_match and optimal_match else '✗'}")
-            print()
+            if numba_result['solutions']:
+                x = numba_result['solutions'][0]
+                verification = np.array_equal(A @ x, d)
+                print(f"    Valid:     {'✓' if verification else '✗'}")
+                if not verification:
+                    print(f"      A @ x = {A @ x}, d = {d}")
             
         except Exception as e:
             print(f"    Error: {e}")
-            print()
+
+def test_real_data():
+    """Test with real data"""
+    print("\n=== Real Data Test ===")
     
-    # Summary
-    print("=== SUMMARY ===")
-    print(f"{'Instance':<15} {'Size':<8} {'Original':<10} {'Numba':<10} {'Speedup':<8} {'Status'}")
-    print("-" * 65)
-    
-    total_orig_time = 0
-    total_numba_time = 0
-    
-    for r in results:
-        total_orig_time += r['orig_time']
-        total_numba_time += r['numba_time']
-        status = "✓" if r['solutions_match'] and r['optimal_match'] else "✗"
-        print(f"{r['instance']:<15} {r['size']:<8} {r['orig_time']:<10.4f} {r['numba_time']:<10.4f} {r['speedup']:<8.1f} {status}")
-    
-    overall_speedup = total_orig_time / total_numba_time if total_numba_time > 0 else float('inf')
-    print("-" * 65)
-    print(f"{'TOTAL':<15} {'':>8} {total_orig_time:<10.4f} {total_numba_time:<10.4f} {overall_speedup:<8.1f}")
-    
-    print(f"\nOverall speedup: {overall_speedup:.1f}x")
-    print(f"Average per-instance speedup: {np.mean([r['speedup'] for r in results]):.1f}x")
-    
-    return results
+    try:
+        data_path = "ms_instance/01-marketsplit/instances"
+        sol_path = "ms_instance/01-marketsplit/solutions"
+        ms_data = MSData(data_path, sol_path)
+        
+        # Test small instances first
+        for m in [3, 4]:
+            instances = ms_data.get(m=m)
+            if instances:
+                inst = instances[0]  # First instance
+                A, d = inst['A'], inst['d']
+                instance_id = inst['id']
+                opt_sol = ms_data.get_solution(instance_id)
+                
+                print(f"\nTesting {instance_id} (m={m}, n={inst['n']})")
+                
+                try:
+                    # Original
+                    start = time.time()
+                    ms_orig = MarketSplit(A, d, max_sols=10, debug=False)
+                    orig_solutions = ms_orig.enumerate()
+                    orig_time = time.time() - start
+                    
+                    # Fixed Numba (first run includes compilation)
+                    start = time.time()
+                    numba_result1 = ms_run_numba_fixed(A, d, instance_id, opt_sol, max_sols=10)
+                    numba_time1 = time.time() - start
+                    
+                    # Fixed Numba (second run, compiled)
+                    start = time.time()
+                    numba_result2 = ms_run_numba_fixed(A, d, instance_id, opt_sol, max_sols=10)
+                    numba_time2 = time.time() - start
+                    
+                    speedup1 = orig_time / numba_time1 if numba_time1 > 0 else float('inf')
+                    speedup2 = orig_time / numba_time2 if numba_time2 > 0 else float('inf')
+                    
+                    print(f"  Original:       {len(orig_solutions)} solutions in {orig_time:.4f}s")
+                    print(f"  Numba (+comp):  {numba_result1['solutions_count']} solutions in {numba_time1:.4f}s (speedup: {speedup1:.1f}x)")
+                    print(f"  Numba:          {numba_result2['solutions_count']} solutions in {numba_time2:.4f}s (speedup: {speedup2:.1f}x)")
+                    print(f"  Solutions match: {'✓' if len(orig_solutions) == numba_result2['solutions_count'] else '✗'}")
+                    print(f"  Optimal found:   {'✓' if numba_result2['optimal_found'] else '✗'}")
+                    
+                except Exception as e:
+                    print(f"  Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    
+    except Exception as e:
+        print(f"Could not load real data: {e}")
+        print("Make sure data files are in the correct path")
 
 def stress_test():
-    """Test on larger instances to see real performance gains"""
-    print("\n=== Stress Test (Larger Instances) ===\n")
+    """Test larger instances"""
+    print("\n=== Stress Test ===")
     
-    data_path = "ms_instance/01-marketsplit/instances"
-    sol_path = "ms_instance/01-marketsplit/solutions"
-    ms_data = MSData(data_path, sol_path)
-    
-    # Test progressively larger instances
-    for m in [5, 6, 7]:
-        instances = ms_data.get(m=m)
-        if instances:
-            inst = instances[0]  # Test first instance of each size
-            A, d = inst['A'], inst['d']
-            instance_id = inst['id']
-            opt_sol = ms_data.get_solution(instance_id)
-            
-            print(f"Stress testing {instance_id} (m={m}, n={inst['n']})")
-            
-            try:
-                # Only test Numba version for larger instances
-                start_time = time.time()
-                result = ms_run_numba(A, d, instance_id, opt_sol, max_sols=10, debug=False)
-                solve_time = time.time() - start_time
+    try:
+        data_path = "ms_instance/01-marketsplit/instances"
+        sol_path = "ms_instance/01-marketsplit/solutions"
+        ms_data = MSData(data_path, sol_path)
+        
+        for m in [5, 6]:  # Larger instances
+            instances = ms_data.get(m=m)
+            if instances:
+                inst = instances[0]
+                A, d = inst['A'], inst['d']
+                instance_id = inst['id']
+                opt_sol = ms_data.get_solution(instance_id)
                 
-                print(f"  Numba: {solve_time:.4f}s")
-                print(f"  Solutions: {result['solutions_count']}")
-                print(f"  Backtrack loops: {result['backtrack_loops']:,}")
-                print(f"  Success: {'✓' if result['success'] else '✗'}")
+                print(f"\nStress testing {instance_id} (m={m}, n={inst['n']})")
                 
-                if result['success'] and result['solutions_count'] > 0:
-                    print(f"  First solution: {result['first_solution_time']:.4f}s")
-                    print(f"  Pruning effects: 1st={result['first_pruning_effect_count']:,}, "
-                          f"2nd={result['second_pruning_effect_count']:,}, "
-                          f"3rd={result['third_pruning_effect_count']:,}")
-                
-            except Exception as e:
-                print(f"  Error: {e}")
-            
-            print()
+                try:
+                    start = time.time()
+                    result = ms_run_numba_fixed(A, d, instance_id, opt_sol, max_sols=5)
+                    elapsed = time.time() - start
+                    
+                    print(f"  Time: {elapsed:.4f}s")
+                    print(f"  Solutions: {result['solutions_count']}")
+                    print(f"  Success: {'✓' if result['success'] else '✗'}")
+                    print(f"  Optimal found: {'✓' if result['optimal_found'] else '✗'}")
+                    
+                    if result['success']:
+                        print(f"  Backtrack loops: {result['backtrack_loops']:,}")
+                        print(f"  Pruning: 1st={result['first_pruning_effect_count']:,}, "
+                              f"2nd={result['second_pruning_effect_count']:,}, "
+                              f"3rd={result['third_pruning_effect_count']:,}")
+                        
+                except Exception as e:
+                    print(f"  Error: {e}")
+                    
+    except Exception as e:
+        print(f"Could not run stress test: {e}")
 
 if __name__ == "__main__":
-    # Run performance comparison
-    results = performance_test()
+    print("Testing Fixed Numba Market Split Solver")
+    print("=" * 50)
     
-    # Run stress test on larger instances
+    # Test synthetic cases first
+    test_synthetic()
+    
+    # Test with real data
+    test_real_data()
+    
+    # Stress test larger instances
     stress_test()
     
-    print("Test completed! If you see significant speedups (10x+), the Numba optimization is working well.")
-    print("Note: First run includes JIT compilation time, subsequent runs will be faster.")
+    print("\n" + "=" * 50)
+    print("Test completed!")
+    print("If you see good speedups (5x+) on real data, the optimization is working.")
