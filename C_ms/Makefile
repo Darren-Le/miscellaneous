@@ -1,89 +1,14 @@
-# Makefile for Market Split C Implementation
+CC = g++
+CFLAGS = -Wall -O2 -std=c++11
+LIBS = -lfplll -lm
 
-# Compiler and flags
-CC = gcc
-CXX = g++
-CFLAGS = -Wall -Wextra -O3 -std=c11 -g
-CXXFLAGS = -Wall -Wextra -O3 -std=c++11 -g
+TARGET = ms_solver
+SOURCES = main.cpp ms_data.c ms_solve.c
 
-# Directories
-FPLLL_DIR = /home/szg/local
-INCLUDE_DIR = -I$(FPLLL_DIR)/include -I.
-LIB_DIR = -L$(FPLLL_DIR)/lib
+$(TARGET): $(SOURCES)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) $(LIBS)
 
-# Libraries
-LIBS = -lfplll -lmpfr -lgmp -lm
-
-# Source files
-C_SOURCES = ms_data.c
-CXX_SOURCES = ms_solve.c main.cpp
-HEADERS = ms_data.h ms_solve.h
-
-# Object files
-C_OBJECTS = ms_data.o
-CXX_OBJECTS = ms_solve.o main.o
-OBJECTS = $(C_OBJECTS) $(CXX_OBJECTS)
-
-# Target executable
-TARGET = ms_solve
-
-# Default target
-all: $(TARGET)
-
-# Build target
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $(TARGET) $(LIB_DIR) $(LIBS)
-
-# Compile C source files
-ms_data.o: ms_data.c ms_data.h
-	$(CC) $(CFLAGS) $(INCLUDE_DIR) -c ms_data.c -o ms_data.o
-
-# Compile C++ source files
-ms_solve.o: ms_solve.c ms_solve.h ms_data.h
-	$(CXX) $(CXXFLAGS) $(INCLUDE_DIR) -c ms_solve.c -o ms_solve.o
-
-main.o: main.cpp $(HEADERS)
-	$(CXX) $(CXXFLAGS) $(INCLUDE_DIR) -c main.cpp -o main.o
-
-# Clean build artifacts
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(TARGET)
 
-# Clean and rebuild
-rebuild: clean all
-
-# Test with sample data (if available)
-test: $(TARGET)
-	@echo "Running test with default parameters..."
-	./$(TARGET) --debug
-
-# Test specific m values
-test-small: $(TARGET)
-	@echo "Testing with small instances (m=3,4)..."
-	./$(TARGET) --max_sols 10 --debug
-
-# Help target
-help:
-	@echo "Available targets:"
-	@echo "  all         - Build the executable (default)"
-	@echo "  clean       - Remove build artifacts"
-	@echo "  rebuild     - Clean and rebuild"
-	@echo "  test        - Run test with default parameters"
-	@echo "  test-small  - Run test with small instances"
-	@echo "  help        - Show this help message"
-
-# Phony targets
-.PHONY: all clean rebuild test test-small help
-
-# Debug information
-debug-info:
-	@echo "Compiler: $(CC) / $(CXX)"
-	@echo "C Flags: $(CFLAGS)"
-	@echo "C++ Flags: $(CXXFLAGS)"
-	@echo "Include dirs: $(INCLUDE_DIR)"
-	@echo "Library dirs: $(LIB_DIR)"
-	@echo "Libraries: $(LIBS)"
-	@echo "FPLLL directory: $(FPLLL_DIR)"
-	@echo "C Sources: $(C_SOURCES)"
-	@echo "C++ Sources: $(CXX_SOURCES)"
-	@echo "Objects: $(OBJECTS)"
+.PHONY: clean
