@@ -19,9 +19,9 @@ C_SOURCES = ms_data.c
 CXX_SOURCES = ms_solve.c main.cpp
 HEADERS = ms_data.h ms_solve.h
 
-# Object files
+# Object files  
 C_OBJECTS = $(C_SOURCES:.c=.o)
-CXX_OBJECTS = $(CXX_SOURCES:.c=.o) $(CXX_SOURCES:.cpp=.o)
+CXX_OBJECTS = ms_solve.o main.o
 OBJECTS = $(C_OBJECTS) $(CXX_OBJECTS)
 
 # Target executable
