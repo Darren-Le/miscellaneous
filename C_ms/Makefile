@@ -19,8 +19,8 @@ C_SOURCES = ms_data.c
 CXX_SOURCES = ms_solve.c main.cpp
 HEADERS = ms_data.h ms_solve.h
 
-# Object files  
-C_OBJECTS = $(C_SOURCES:.c=.o)
+# Object files
+C_OBJECTS = ms_data.o
 CXX_OBJECTS = ms_solve.o main.o
 OBJECTS = $(C_OBJECTS) $(CXX_OBJECTS)
 
@@ -35,10 +35,10 @@ $(TARGET): $(OBJECTS)
 	$(CXX) $(OBJECTS) -o $(TARGET) $(LIB_DIR) $(LIBS)
 
 # Compile C source files
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(INCLUDE_DIR) -c $< -o $@
+ms_data.o: ms_data.c ms_data.h
+	$(CC) $(CFLAGS) $(INCLUDE_DIR) -c ms_data.c -o ms_data.o
 
-# For ms_solve.c, compile as C++ due to fplll dependency
+# Compile C++ source files
 ms_solve.o: ms_solve.c ms_solve.h ms_data.h
 	$(CXX) $(CXXFLAGS) $(INCLUDE_DIR) -c ms_solve.c -o ms_solve.o
 
@@ -51,22 +51,6 @@ clean:
 
 # Clean and rebuild
 rebuild: clean all
-
-# Install dependencies (Ubuntu/Debian)
-install-deps:
-	sudo apt-get update
-	sudo apt-get install -y build-essential libgmp-dev libmpfr-dev
-
-# Install fplll (if not already installed)
-install-fplll:
-	@echo "Installing fplll to $(FPLLL_DIR)..."
-	@echo "Make sure you have downloaded and built fplll in $(FPLLL_DIR)"
-	@echo "If not installed, run:"
-	@echo "  wget https://github.com/fplll/fplll/releases/download/5.4.2/fplll-5.4.2.tar.gz"
-	@echo "  tar xzf fplll-5.4.2.tar.gz"
-	@echo "  cd fplll-5.4.2"
-	@echo "  ./configure --prefix=$(FPLLL_DIR)"
-	@echo "  make && make install"
 
 # Test with sample data (if available)
 test: $(TARGET)
@@ -86,12 +70,10 @@ help:
 	@echo "  rebuild     - Clean and rebuild"
 	@echo "  test        - Run test with default parameters"
 	@echo "  test-small  - Run test with small instances"
-	@echo "  install-deps - Install system dependencies"
-	@echo "  install-fplll - Show fplll installation instructions"
 	@echo "  help        - Show this help message"
 
 # Phony targets
-.PHONY: all clean rebuild test test-small install-deps install-fplll help
+.PHONY: all clean rebuild test test-small help
 
 # Debug information
 debug-info:
@@ -102,5 +84,6 @@ debug-info:
 	@echo "Library dirs: $(LIB_DIR)"
 	@echo "Libraries: $(LIBS)"
 	@echo "FPLLL directory: $(FPLLL_DIR)"
-	@echo "Sources: $(C_SOURCES) $(CXX_SOURCES)"
+	@echo "C Sources: $(C_SOURCES)"
+	@echo "C++ Sources: $(CXX_SOURCES)"
 	@echo "Objects: $(OBJECTS)"
