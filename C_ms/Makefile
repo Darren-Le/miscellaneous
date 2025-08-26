@@ -15,7 +15,7 @@ LIB_DIR = -L$(FPLLL_DIR)/lib
 LIBS = -lfplll -lmpfr -lgmp -lm
 
 # Source files
-C_SOURCES = ms_data.c main.c
+C_SOURCES = ms_data.c main.cpp
 CXX_SOURCES = ms_solve.c
 HEADERS = ms_data.h ms_solve.h
 
