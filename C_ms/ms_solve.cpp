@@ -194,7 +194,7 @@ void MarketSplit::get_extended_matrix() {
     for (int i = 0; i < n; i++) {
         L(m + i, 1 + i) = 2 * c(i);
     }
-    
+
     std::cout << "L.rows(): " << L.rows() << std::endl;
     std::cout << "L.cols(): " << L.cols() << std::endl;
     std::cout << "ext_m: " << ext_m << std::endl;
@@ -234,7 +234,7 @@ void MarketSplit::get_reduced_basis() {
     
     // Apply BKZ reduction
     int block_size = min(30, ext_n / 2);
-    bkz_reduction(fplll_mat, BKZ_VERBOSE, block_size);
+    int status = bkz_reduction(fplll_mat, block_size, BKZ_VERBOSE, FT_DEFAULT, 0);
 
     // Debug: Print the matrix after BKZ
     std::cout << "After BKZ reduction (" << ext_n << "x" << ext_m << "):" << std::endl;
