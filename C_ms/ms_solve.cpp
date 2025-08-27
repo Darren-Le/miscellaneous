@@ -59,7 +59,7 @@ void MSData::load_instances(const string& path) {
 
 void MSData::load_solutions(const string& path) {
     for (const auto& entry : fs::directory_iterator(path)) {
-        if (entry.path().extension() == ".sol") {
+        if (entry.path().filename().string().find(".opt.sol") != string::npos) {
             ifstream file(entry.path());
             if (!file.is_open()) continue;
             
@@ -139,6 +139,8 @@ MarketSplit::MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r
       first_pruning_count(0), second_pruning_count(0), third_pruning_count(0),
       first_solution_time(0.0) {
     
+    start_time = high_resolution_clock::now();
+
     if (r.size() == 0) {
         this->r = VectorXi::Ones(n);
     } else {
@@ -149,6 +151,9 @@ MarketSplit::MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r
     get_reduced_basis();
     get_gso();
     compute_dual_norms();
+
+    verify_gso();
+    verify_dual();
 }
 
 int MarketSplit::compute_lcm(const vector<int>& nums) {
@@ -300,9 +305,10 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
                 
                 if ((A * x - d).norm() < 1e-10) {
                     if (first_solution_time == 0.0) {
+                        auto current_time = high_resolution_clock::now();
+                        first_solution_time = duration<double>(current_time - start_time).count();
                         first_sol_bt_loops = backtrack_loops;
                     }
-                    
                     solutions.push_back(x);
                     if (max_sols > 0 && static_cast<int>(solutions.size()) >= max_sols) {
                         return true;
@@ -374,6 +380,46 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
     return false;
 }
 
+bool MarketSplit::verify_gso(double tol) const {
+    // Check orthogonality
+    for (int i = 0; i < n_basis; i++) {
+        for (int j = i + 1; j < n_basis; j++) {
+            double dot_product = b_hat.row(i).dot(b_hat.row(j));
+            if (abs(dot_product) > tol) {
+                if (debug) cout << "Orthogonality failed: b_hat[" << i << "] · b_hat[" << j << "] = " << dot_product << endl;
+                return false;
+            }
+        }
+    }
+    for (int i = 0; i < n_basis; i++) {
+        VectorXd reconstructed = b_hat.row(i);
+        for (int j = 0; j < i; j++) {
+            reconstructed += mu(i, j) * b_hat.row(j);
+        }
+        
+        if (!basis.row(i).cast<double>().isApprox(reconstructed, tol)) {
+            if (debug) cout << "GSO formula failed for basis[" << i << "]" << endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool MarketSplit::verify_dual(double tol) const {
+    for (int i = 0; i < n_basis; i++) {
+        for (int j = 0; j < n_basis; j++) {
+            double dot_product = b_bar.row(i).dot(basis.row(j).cast<double>());
+            double expected = (i == j) ? 1.0 : 0.0;
+            if (abs(dot_product - expected) > tol) {
+                if (debug) cout << "Dual property failed" << endl;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+
 vector<VectorXi> MarketSplit::enumerate() {
     vector<VectorXi> solutions;
     double c = (n + 1) * rmax * rmax;
@@ -409,7 +455,7 @@ SolveResult ms_run(const MatrixXi& A, const VectorXi& d, const string& instance_
         bool found_opt = false;
         if (opt_sol != nullptr) {
             for (const auto& sol : solutions) {
-                if (sol.isApprox(*opt_sol)) {
+                if (sol == *opt_sol) {
                     found_opt = true;
                     break;
                 }

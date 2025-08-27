@@ -5,11 +5,13 @@
 #include <string>
 #include <unordered_map>
 #include <Eigen/Dense>
-#include <fplll.h>
+#include <chrono>
+#include <fplll/fplll.h>
 
 using namespace Eigen;
 using namespace std;
 using namespace fplll;
+using namespace std::chrono;
 
 struct Instance {
     string id;
@@ -52,6 +54,7 @@ private:
     long long backtrack_loops, dive_loops, first_sol_bt_loops;
     long long first_pruning_count, second_pruning_count, third_pruning_count;
     double first_solution_time;
+    high_resolution_clock::time_point start_time;
     
     int max_sols;
     bool debug;
@@ -68,6 +71,8 @@ public:
     MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r = VectorXi(), int max_sols = -1, bool debug = false);
     vector<VectorXi> enumerate();
     
+    bool verify_gso(double tol = 1e-10) const;
+    bool verify_dual(double tol = 1e-10) const;
     // Getters for statistics
     long long get_backtrack_loops() const { return backtrack_loops; }
     long long get_dive_loops() const { return dive_loops; }
