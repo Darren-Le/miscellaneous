@@ -198,8 +198,6 @@ void MarketSplit::get_extended_matrix() {
 
     std::cout << "L.rows(): " << L.rows() << std::endl;
     std::cout << "L.cols(): " << L.cols() << std::endl;
-    std::cout << "ext_m: " << ext_m << std::endl;
-    std::cout << "ext_n: " << ext_n << std::endl;
     std::cout << "m: " << m << std::endl; 
     std::cout << "n: " << n << std::endl;
     std::cout << "rmax: " << rmax << std::endl;
