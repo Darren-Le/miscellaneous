@@ -178,7 +178,7 @@ void MarketSplit::get_extended_matrix() {
     }
     
     // Create extended matrix L
-    int pows = to_string(A.cwiseAbs().maxCoeff()).length() + to_string(d.cwiseAbs().maxCoeff()).length() - 1;
+    int pows = to_string(A.cwiseAbs().maxCoeff()).length() + to_string(d.cwiseAbs().maxCoeff()).length() - 2;
     int N = static_cast<int>(pow(10, pows));
     
     L.resize(m + n + 1, n + 1);
