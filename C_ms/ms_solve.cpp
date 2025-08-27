@@ -207,11 +207,30 @@ void MarketSplit::get_reduced_basis() {
             fplll_mat[i][j] = L(j, i);
         }
     }
+    // Debug: Print original matrix
+    std::cout << "Before BKZ reduction:" << std::endl;
+    for (int i = 0; i < min(5, ext_n); i++) {
+        for (int j = 0; j < ext_m; j++) {
+            std::cout << fplll_mat[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "..." << std::endl;
     
     // Apply BKZ reduction
     int block_size = min(30, ext_n / 2);
     bkz_reduction(fplll_mat, BKZ_VERBOSE, block_size);
-    
+
+    // Debug: Print the matrix after BKZ
+    std::cout << "After BKZ reduction (" << ext_n << "x" << ext_m << "):" << std::endl;
+    for (int i = 0; i < min(10, ext_n); i++) {  // Print first 10 rows only
+        for (int j = 0; j < ext_m; j++) {
+            std::cout << fplll_mat[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "..." << std::endl;
+
     // Extract null space basis
     vector<VectorXi> basis_vectors;
     
