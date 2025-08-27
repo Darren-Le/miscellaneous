@@ -180,7 +180,8 @@ void MarketSplit::get_extended_matrix() {
     int pows = to_string(A.cwiseAbs().maxCoeff()).length() + to_string(d.cwiseAbs().maxCoeff()).length() + 2;
     int N = static_cast<int>(pow(10, pows));
     
-    L = MatrixXi::Zero(m + n + 1, n + 1);
+    L.resize(m + n + 1, n + 1);
+    L.setZero();  // Explicit zero initialization
     
     // First column
     L.block(0, 0, m, 1) = -N * d;
