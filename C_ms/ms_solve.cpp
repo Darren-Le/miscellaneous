@@ -1,7 +1,7 @@
 #include "ms_solve.h"
 #include <fstream>
 #include <sstream>
-#include <filesystem>
+#include <experimental/filesystem>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -10,6 +10,8 @@
 
 using namespace std::chrono;
 
+namespace fs = std::experimental::filesystem;
+
 // MSData Implementation
 MSData::MSData(const string& data_path, const string& sol_path) {
     load_instances(data_path);
@@ -17,7 +19,7 @@ MSData::MSData(const string& data_path, const string& sol_path) {
 }
 
 void MSData::load_instances(const string& path) {
-    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+    for (const auto& entry : fs::directory_iterator(path)) {
         if (entry.path().extension() == ".dat") {
             ifstream file(entry.path());
             if (!file.is_open()) continue;
@@ -56,7 +58,7 @@ void MSData::load_instances(const string& path) {
 }
 
 void MSData::load_solutions(const string& path) {
-    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+    for (const auto& entry : fs::directory_iterator(path)) {
         if (entry.path().extension() == ".sol") {
             ifstream file(entry.path());
             if (!file.is_open()) continue;
