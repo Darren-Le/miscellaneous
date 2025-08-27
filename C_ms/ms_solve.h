@@ -49,10 +49,11 @@ private:
     MatrixXi basis;
     MatrixXd b_hat, b_bar, mu;
     VectorXd b_hat_norms_sq, b_bar_norms_l2, b_bar_norms_l1;
+    MatrixXd coords;
     
     // Statistics
     long long backtrack_loops, dive_loops, first_sol_bt_loops;
-    long long first_pruning_count, second_pruning_count, third_pruning_count;
+    long long first_pruning_effect_count, second_pruning_effect_count, third_pruning_effect_count;
     double first_solution_time;
     high_resolution_clock::time_point start_time;
     
@@ -65,6 +66,7 @@ private:
     void get_reduced_basis();
     void get_gso();
     void compute_dual_norms();
+    void get_coordinates();
     bool backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds);
 
 public:
@@ -77,9 +79,9 @@ public:
     long long get_backtrack_loops() const { return backtrack_loops; }
     long long get_dive_loops() const { return dive_loops; }
     long long get_first_sol_bt_loops() const { return first_sol_bt_loops; }
-    long long get_first_pruning_count() const { return first_pruning_count; }
-    long long get_second_pruning_count() const { return second_pruning_count; }
-    long long get_third_pruning_count() const { return third_pruning_count; }
+    long long get_first_pruning_effect_count() const { return first_pruning_effect_count; }
+    long long get_second_pruning_effect_count() const { return second_pruning_effect_count; }
+    long long get_third_pruning_effect_count() const { return third_pruning_effect_count; }
     double get_first_solution_time() const { return first_solution_time; }
 };
 
@@ -89,7 +91,7 @@ struct SolveResult {
     vector<VectorXi> solutions;
     bool optimal_found;
     long long backtrack_loops, dive_loops, first_sol_bt_loops;
-    long long first_pruning_count, second_pruning_count, third_pruning_count;
+    long long first_pruning_effect_count, second_pruning_effect_count, third_pruning_effect_count;
     double solve_time, first_solution_time, init_time;
     bool success;
     string error;

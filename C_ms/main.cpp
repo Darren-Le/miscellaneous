@@ -65,8 +65,8 @@ int main(int argc, char* argv[]) {
                 cout << fixed << setprecision(4)
                      << status << " " << result.id << ": " << result.solutions_count << " solutions, "
                      << "optimal: " << opt_status << ", bt_loops: " << result.backtrack_loops << ", "
-                     << "dive_loops: " << result.dive_loops << ", 1st_prune: " << result.first_pruning_count << ", "
-                     << "2nd_prune: " << result.second_pruning_count << ", 3rd_prune: " << result.third_pruning_count << ", "
+                     << "dive_loops: " << result.dive_loops << ", 1st_prune: " << result.first_pruning_effect_count << ", "
+                     << "2nd_prune: " << result.second_pruning_effect_count << ", 3rd_prune: " << result.third_pruning_effect_count << ", "
                      << "time: " << result.solve_time << "s, "
                      << "1st_sol: " << result.first_solution_time << "s, 1st_bt: " << result.first_sol_bt_loops << ", "
                      << "init: " << result.init_time << "s" << endl;
@@ -131,9 +131,9 @@ int main(int argc, char* argv[]) {
                 << fixed << setprecision(4)
                 << setw(10) << result.solve_time
                 << setw(10) << result.first_solution_time
-                << setw(10) << result.first_pruning_count
-                << setw(10) << result.second_pruning_count
-                << setw(10) << result.third_pruning_count
+                << setw(10) << result.first_pruning_effect_count
+                << setw(10) << result.second_pruning_effect_count
+                << setw(10) << result.third_pruning_effect_count
                 << setw(10) << result.init_time
                 << setw(10) << result.solutions_count
                 << setw(8) << result.first_sol_bt_loops

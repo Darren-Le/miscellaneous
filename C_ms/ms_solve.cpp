@@ -136,7 +136,7 @@ const VectorXi* MSData::get_solution(const string& id) const {
 MarketSplit::MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r, int max_sols, bool debug)
     : A(A), d(d), m(A.rows()), n(A.cols()), n_basis(n - m + 1), max_sols(max_sols), debug(debug),
       backtrack_loops(0), dive_loops(0), first_sol_bt_loops(0),
-      first_pruning_count(0), second_pruning_count(0), third_pruning_count(0),
+      first_pruning_effect_count(0), second_pruning_effect_count(0), third_pruning_effect_count(0),
       first_solution_time(0.0) {
     
     start_time = high_resolution_clock::now();
@@ -151,6 +151,7 @@ MarketSplit::MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r
     get_reduced_basis();
     get_gso();
     compute_dual_norms();
+    get_coordinates();
 
     verify_gso();
     verify_dual();
@@ -233,7 +234,7 @@ void MarketSplit::get_reduced_basis() {
     
     // Apply BKZ reduction
     int block_size = min(30, ext_n / 2);
-    int status = bkz_reduction(fplll_mat, block_size, BKZ_VERBOSE, FT_DEFAULT, 0);
+    int status = bkz_reduction(fplll_mat, block_size, BKZ_DEFAULT, FT_DEFAULT, 0);
 
     // Debug: Print the matrix after BKZ
     std::cout << "After BKZ reduction (" << ext_n << "x" << ext_m << "):" << std::endl;
@@ -313,6 +314,16 @@ void MarketSplit::compute_dual_norms() {
     }
 }
 
+void MarketSplit::get_coordinates() {
+    MatrixXd L_bottom = L.block(m, 0, n + 1, n + 1).cast<double>();
+    coords.resize(n_basis, n + 1);
+    
+    for (int i = 0; i < n_basis; i++) {
+        VectorXd rhs = basis.row(i).cast<double>();
+        coords.row(i) = L_bottom.colPivHouseholderQr().solve(rhs);
+    }
+}
+
 bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, 
                            vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds) {
     backtrack_loops++;
@@ -359,7 +370,7 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
     // First pruning condition
     if (prev_w_norm_sq > c + 1e-10) {
         dive_loops++;
-        first_pruning_count++;
+        first_pruning_effect_count++;
         return false;
     }
     
@@ -387,7 +398,7 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
     int final_range = max(0, u_max - u_min + 1);
     
     if (final_range < original_range) {
-        second_pruning_count++;
+        second_pruning_effect_count++;
     }
     
     // Third pruning strategy
@@ -402,10 +413,10 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
         
         if (w_norm_sq > rmax * w_norm_l1 + 1e-10) {
             if (coeff > 0) {
-                third_pruning_count += (u_max - u_val);
+                third_pruning_effect_count += (u_max - u_val);
                 break;
             }
-            third_pruning_count++;
+            third_pruning_effect_count++;
             continue;
         }
         
@@ -507,9 +518,9 @@ SolveResult ms_run(const MatrixXi& A, const VectorXi& d, const string& instance_
             ms.get_backtrack_loops(),
             ms.get_dive_loops(),
             ms.get_first_sol_bt_loops(),
-            ms.get_first_pruning_count(),
-            ms.get_second_pruning_count(),
-            ms.get_third_pruning_count(),
+            ms.get_first_pruning_effect_count(),
+            ms.get_second_pruning_effect_count(),
+            ms.get_third_pruning_effect_count(),
             solve_time,
             ms.get_first_solution_time(),
             init_time,
