@@ -15,8 +15,8 @@ void print_and_log(const string& text, ofstream& file) {
 
 int main(int argc, char* argv[]) {
     // Default parameters
-    string data_path = "ms_instance/01-marketsplit/instances";
-    string sol_path = "ms_instance/01-marketsplit/solutions";
+    string data_path = "../ms_instance/01-marketsplit/instances";
+    string sol_path = "../ms_instance/01-marketsplit/solutions";
     int max_sols = -1;
     bool debug = false;
     
