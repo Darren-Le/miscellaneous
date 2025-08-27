@@ -122,6 +122,11 @@ class MarketSplit:
         for i in range(self.n):
             self.L[self.m + i, 1 + i] = 2 * self.c[i]
         
+        print(f"L.shape: {ms.L.shape}")
+        print(f"m: {ms.m}, n: {ms.n}")  
+        print(f"rmax: {ms.rmax}")
+        print(f"L matrix (first 10 rows, first 10 cols):")
+        print(ms.L[:10, :10])
 
     def _get_reduced_basis(self):
         ext_m, ext_n = self.L.shape

@@ -194,6 +194,21 @@ void MarketSplit::get_extended_matrix() {
     for (int i = 0; i < n; i++) {
         L(m + i, 1 + i) = 2 * c(i);
     }
+    
+    std::cout << "L.rows(): " << L.rows() << std::endl;
+    std::cout << "L.cols(): " << L.cols() << std::endl;
+    std::cout << "ext_m: " << ext_m << std::endl;
+    std::cout << "ext_n: " << ext_n << std::endl;
+    std::cout << "m: " << m << std::endl; 
+    std::cout << "n: " << n << std::endl;
+    std::cout << "rmax: " << rmax << std::endl;
+    std::cout << "L matrix (first 10 rows, first 10 cols):" << std::endl;
+    for (int i = 0; i < min(10, (int)L.rows()); i++) {
+        for (int j = 0; j < min(10, (int)L.cols()); j++) {
+            std::cout << L(i,j) << " ";
+        }
+        std::cout << std::endl;
+}
 }
 
 void MarketSplit::get_reduced_basis() {
