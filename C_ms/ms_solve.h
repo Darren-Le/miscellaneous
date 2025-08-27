@@ -1,125 +1,94 @@
 #ifndef MS_SOLVE_H
 #define MS_SOLVE_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <string.h>
-#include <time.h>
-#include <sys/time.h>
-#include <fplll/fplll.h>
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <Eigen/Dense>
+#include <fplll.h>
 
-typedef struct {
-    int* solution;
-    int n;
-} Solution;
+using namespace Eigen;
+using namespace std;
+using namespace fplll;
 
-typedef struct {
-    Solution* solutions;
-    int count;
-    int capacity;
-} SolutionSet;
-
-typedef struct {
-    // Input data
-    int** A;
-    int* d;
+struct Instance {
+    string id;
     int m, n;
-    int n_basis;
-    int* r;
-    int rmax;
-    int* c;
+    MatrixXi A;
+    VectorXi d;
+};
+
+class MSData {
+private:
+    vector<Instance> data;
+    unordered_map<string, int> by_id;
+    unordered_map<string, VectorXi> solutions;
     
-    // Extended matrix
-    int** L;
-    int L_rows, L_cols;
+    void load_instances(const string& path);
+    void load_solutions(const string& path);
+
+public:
+    MSData(const string& data_path, const string& sol_path);
+    const Instance* get(const string& id) const;
+    vector<const Instance*> get_by_size(int m, int n) const;
+    const VectorXi* get_solution(const string& id) const;
+    size_t size() const { return data.size(); }
+};
+
+class MarketSplit {
+private:
+    MatrixXi A;
+    VectorXi d, r, c;
+    int m, n, n_basis, rmax;
     
-    // Lattice basis (stored as row vectors)
-    int** basis;      // n_basis x (n+1) matrix
-    
-    // Gram-Schmidt orthogonalization
-    double** b_hat;   // n_basis x (n+1) matrix
-    double* b_hat_norms_sq;
-    double** mu;      // n_basis x n_basis matrix
-    
-    // Dual basis
-    double** b_bar;   // n_basis x (n+1) matrix
-    double* b_bar_norms_l1;
-    double* b_bar_norms_l2;
-    
-    // Coordinates
-    double** coords;  // n_basis x (n+1) matrix
+    // Lattice data
+    MatrixXi L;
+    MatrixXi basis;
+    MatrixXd b_hat, b_bar, mu;
+    VectorXd b_hat_norms_sq, b_bar_norms_l2, b_bar_norms_l1;
     
     // Statistics
-    long backtrack_loops;
-    long first_sol_bt_loops;
-    long dive_loops;
-    long first_pruning_effect_count;
-    long second_pruning_effect_count;
-    long third_pruning_effect_count;
-    
-    // Timing
+    long long backtrack_loops, dive_loops, first_sol_bt_loops;
+    long long first_pruning_count, second_pruning_count, third_pruning_count;
     double first_solution_time;
-    struct timeval start_time;
     
-    // Configuration
     int max_sols;
-    int debug;
-} MarketSplit;
+    bool debug;
+    
+    // Helper methods
+    int compute_lcm(const vector<int>& nums);
+    void get_extended_matrix();
+    void get_reduced_basis();
+    void get_gso();
+    void compute_dual_norms();
+    bool backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds);
 
-typedef struct {
-    char id[256];
+public:
+    MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r = VectorXi(), int max_sols = -1, bool debug = false);
+    vector<VectorXi> enumerate();
+    
+    // Getters for statistics
+    long long get_backtrack_loops() const { return backtrack_loops; }
+    long long get_dive_loops() const { return dive_loops; }
+    long long get_first_sol_bt_loops() const { return first_sol_bt_loops; }
+    long long get_first_pruning_count() const { return first_pruning_count; }
+    long long get_second_pruning_count() const { return second_pruning_count; }
+    long long get_third_pruning_count() const { return third_pruning_count; }
+    double get_first_solution_time() const { return first_solution_time; }
+};
+
+struct SolveResult {
+    string id;
     int solutions_count;
-    Solution* solutions;
-    int optimal_found;
-    long backtrack_loops;
-    long first_sol_bt_loops;
-    long dive_loops;
-    long first_pruning_effect_count;
-    long second_pruning_effect_count;
-    long third_pruning_effect_count;
-    double solve_time;
-    double first_solution_time;
-    double init_time;
-    int success;
-    char error[512];
-} MSResult;
+    vector<VectorXi> solutions;
+    bool optimal_found;
+    long long backtrack_loops, dive_loops, first_sol_bt_loops;
+    long long first_pruning_count, second_pruning_count, third_pruning_count;
+    double solve_time, first_solution_time, init_time;
+    bool success;
+    string error;
+};
 
-// Function declarations
-MarketSplit* ms_create(int** A, int* d, int m, int n, int* r, int max_sols, int debug);
-void ms_destroy(MarketSplit* ms);
+SolveResult ms_run(const MatrixXi& A, const VectorXi& d, const string& instance_id, const VectorXi* opt_sol = nullptr, int max_sols = -1, bool debug = false);
 
-int ms_get_extended_matrix(MarketSplit* ms, int N);
-int ms_get_reduced_basis(MarketSplit* ms);
-int ms_get_gso(MarketSplit* ms);
-int ms_compute_dual_norms(MarketSplit* ms);
-int ms_get_coordinates(MarketSplit* ms);
-
-int ms_verify_gso(MarketSplit* ms, double tol);
-int ms_verify_dual(MarketSplit* ms, double tol);
-
-SolutionSet* ms_enumerate(MarketSplit* ms);
-MSResult* ms_run(int** A, int* d, int m, int n, const char* instance_id, int* opt_sol, int opt_n, int max_sols, int debug);
-
-// Solution set management
-SolutionSet* solution_set_create();
-void solution_set_destroy(SolutionSet* set);
-int solution_set_add(SolutionSet* set, int* solution, int n);
-int solutions_equal(int* sol1, int* sol2, int n);
-
-// Utility functions
-int compute_lcm_array(int* nums, int count);
-int gcd(int a, int b);
-int lcm(int a, int b);
-double get_time_diff(struct timeval start, struct timeval end);
-double get_current_time();
-
-// Matrix utilities for lattice operations
-double** allocate_2d_double(int rows, int cols);
-void free_2d_double(double** matrix, int rows);
-double vector_dot_product(double* a, double* b, int n);
-double vector_norm_l1(double* v, int n);
-double vector_norm_l2(double* v, int n);
-int vectors_equal_approx(double* a, double* b, int n, double tol);
-
-#endif // MS_SOLVE_H
+#endif
