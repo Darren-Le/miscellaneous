@@ -235,6 +235,10 @@ void MarketSplit::get_reduced_basis() {
     
     // Convert to matrix
     basis.resize(n_basis, n + 1);
+    std::cout << "n_basis: " << n_basis << std::endl;
+    std::cout << "basis_vectors.size(): " << basis_vectors.size() << std::endl;
+    std::cout << "basis.rows(): " << basis.rows() << std::endl;
+    std::cout << "basis.cols(): " << basis.cols() << std::endl;
     for (int i = 0; i < n_basis; i++) {
         basis.row(i) = basis_vectors[i];
     }
