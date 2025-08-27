@@ -79,7 +79,10 @@ void MSData::load_solutions(const string& path) {
             }
             
             if (!x_vars.empty()) {
-                int n = x_vars.rbegin()->first;
+                int n = 0;
+                for (const auto& pair : x_vars) {
+                    n = max(n, pair.first);
+                }
                 VectorXi x = VectorXi::Zero(n);
                 
                 for (const auto& pair : x_vars) {
