@@ -51,17 +51,7 @@ int main(int argc, char* argv[]) {
         vector<SolveResult> all_results;
         
         for (int m : test_m_values) {
-            // Get all instances and filter by m
-            vector<const Instance*> m_instances;
-            for (size_t i = 0; i < ms_data.size(); i++) {
-                // Since MSData doesn't expose direct iteration, we need to implement it
-                // For now, use get_by_size with different n values to find instances
-                for (int n = m; n <= m + 20; n++) {  // Reasonable range for n
-                    auto instances_mn = ms_data.get_by_size(m, n);
-                    m_instances.insert(m_instances.end(), instances_mn.begin(), instances_mn.end());
-                }
-            }
-            
+            auto m_instances = ms_data.get_by_m(m);
             cout << "Testing " << m_instances.size() << " instances with m = " << m << endl;
             
             for (const auto* inst : m_instances) {

@@ -1,181 +1,431 @@
 #include "ms_solve.h"
-#include <iostream>
-#include <iomanip>
 #include <fstream>
-#include <ctime>
+#include <sstream>
+#include <experimental/filesystem>
+#include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <numeric>
+#include <iostream>
 
-using namespace std;
 using namespace std::chrono;
 
-void print_and_log(const string& text, ofstream& file) {
-    cout << text << endl;
-    file << text << endl;
+namespace fs = std::experimental::filesystem;
+
+// MSData Implementation
+MSData::MSData(const string& data_path, const string& sol_path) {
+    load_instances(data_path);
+    load_solutions(sol_path);
 }
 
-int main(int argc, char* argv[]) {
-    // Default parameters
-    string data_path = "ms_instance/01-marketsplit/instances";
-    string sol_path = "ms_instance/01-marketsplit/solutions";
-    int max_sols = -1;
-    bool debug = false;
-    
-    // Parse command line arguments
-    for (int i = 1; i < argc; i++) {
-        string arg = argv[i];
-        if (arg == "--data_path" && i + 1 < argc) {
-            data_path = argv[++i];
-        } else if (arg == "--sol_path" && i + 1 < argc) {
-            sol_path = argv[++i];
-        } else if (arg == "--max_sols" && i + 1 < argc) {
-            max_sols = stoi(argv[++i]);
-        } else if (arg == "--debug") {
-            debug = true;
-        } else if (arg == "--help") {
-            cout << "Usage: " << argv[0] << " [options]\n"
-                 << "Options:\n"
-                 << "  --data_path PATH   Path to instance data (default: ms_instance/01-marketsplit/instances)\n"
-                 << "  --sol_path PATH    Path to solution data (default: ms_instance/01-marketsplit/solutions)\n" 
-                 << "  --max_sols N       Maximum solutions to find (-1 for all, default: -1)\n"
-                 << "  --debug            Enable debug output\n"
-                 << "  --help             Show this help message\n";
-            return 0;
+void MSData::load_instances(const string& path) {
+    for (const auto& entry : fs::directory_iterator(path)) {
+        if (entry.path().extension() == ".dat") {
+            ifstream file(entry.path());
+            if (!file.is_open()) continue;
+            
+            string line;
+            vector<string> lines;
+            
+            while (getline(file, line)) {
+                if (!line.empty() && line[0] != '#') {
+                    lines.push_back(line);
+                }
+            }
+            
+            if (lines.empty()) continue;
+            
+            istringstream iss(lines[0]);
+            int m, n;
+            iss >> m >> n;
+            
+            MatrixXi A(m, n);
+            VectorXi d(m);
+            
+            for (int i = 0; i < m; i++) {
+                istringstream row_iss(lines[i + 1]);
+                for (int j = 0; j < n; j++) {
+                    row_iss >> A(i, j);
+                }
+                row_iss >> d(i);
+            }
+            
+            string id = entry.path().stem().string();
+            data.push_back({id, m, n, A, d});
+            by_id[id] = data.size() - 1;
         }
     }
+}
+
+void MSData::load_solutions(const string& path) {
+    for (const auto& entry : fs::directory_iterator(path)) {
+        if (entry.path().extension() == ".sol") {
+            ifstream file(entry.path());
+            if (!file.is_open()) continue;
+            
+            unordered_map<int, int> x_vars;
+            string line;
+            
+            while (getline(file, line)) {
+                if (!line.empty() && line[0] != '#' && line.substr(0, 2) == "x#") {
+                    istringstream iss(line);
+                    string var_name;
+                    int var_val;
+                    iss >> var_name >> var_val;
+                    
+                    int var_num = stoi(var_name.substr(2));
+                    x_vars[var_num] = var_val;
+                }
+            }
+            
+            if (!x_vars.empty()) {
+                int n = 0;
+                for (const auto& pair : x_vars) {
+                    n = max(n, pair.first);
+                }
+                VectorXi x = VectorXi::Zero(n);
+                
+                for (const auto& pair : x_vars) {
+                    if (pair.first >= 1 && pair.first <= n) {
+                        x(pair.first - 1) = pair.second;
+                    }
+                }
+                
+                string id = entry.path().stem().string();
+                size_t pos = id.find(".opt");
+                if (pos != string::npos) {
+                    id = id.substr(0, pos);
+                }
+                solutions[id] = x;
+            }
+        }
+    }
+}
+
+const Instance* MSData::get(const string& id) const {
+    auto it = by_id.find(id);
+    return (it != by_id.end()) ? &data[it->second] : nullptr;
+}
+
+vector<const Instance*> MSData::get_by_size(int m, int n) const {
+    vector<const Instance*> result;
+    for (const auto& inst : data) {
+        if (inst.m == m && inst.n == n) {
+            result.push_back(&inst);
+        }
+    }
+    return result;
+}
+
+const VectorXi* MSData::get_solution(const string& id) const {
+    auto it = solutions.find(id);
+    return (it != solutions.end()) ? &it->second : nullptr;
+}
+
+// MarketSplit Implementation
+MarketSplit::MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r, int max_sols, bool debug)
+    : A(A), d(d), m(A.rows()), n(A.cols()), n_basis(n - m + 1), max_sols(max_sols), debug(debug),
+      backtrack_loops(0), dive_loops(0), first_sol_bt_loops(0),
+      first_pruning_count(0), second_pruning_count(0), third_pruning_count(0),
+      first_solution_time(0.0) {
+    
+    if (r.size() == 0) {
+        this->r = VectorXi::Ones(n);
+    } else {
+        this->r = r;
+    }
+    
+    get_extended_matrix();
+    get_reduced_basis();
+    get_gso();
+    compute_dual_norms();
+}
+
+int MarketSplit::compute_lcm(const vector<int>& nums) {
+    if (nums.empty()) return 1;
+    
+    int result = nums[0];
+    for (size_t i = 1; i < nums.size(); i++) {
+        result = (result / std::gcd(result, nums[i])) * nums[i];
+    }
+    return abs(result);
+}
+
+void MarketSplit::get_extended_matrix() {
+    // Compute rmax and c
+    vector<int> r_vec(r.data(), r.data() + r.size());
+    rmax = compute_lcm(r_vec);
+    
+    c.resize(n);
+    for (int i = 0; i < n; i++) {
+        c(i) = rmax / r(i);
+    }
+    
+    // Create extended matrix L
+    int pows = to_string(A.cwiseAbs().maxCoeff()).length() + to_string(d.cwiseAbs().maxCoeff()).length() + 2;
+    int N = static_cast<int>(pow(10, pows));
+    
+    L = MatrixXi::Zero(m + n + 1, n + 1);
+    
+    // First column
+    L.block(0, 0, m, 1) = -N * d;
+    L.block(m, 0, n, 1) = VectorXi::Constant(n, -rmax);
+    L(m + n, 0) = rmax;
+    
+    // Top-right block
+    L.block(0, 1, m, n) = N * A;
+    
+    // Middle diagonal block
+    for (int i = 0; i < n; i++) {
+        L(m + i, 1 + i) = 2 * c(i);
+    }
+}
+
+void MarketSplit::get_reduced_basis() {
+    // Convert to fplll format
+    int ext_m = L.rows();
+    int ext_n = L.cols();
+    
+    ZZ_mat<mpz_t> fplll_mat(ext_n, ext_m);
+    for (int i = 0; i < ext_n; i++) {
+        for (int j = 0; j < ext_m; j++) {
+            fplll_mat[i][j] = L(j, i);
+        }
+    }
+    
+    // Apply BKZ reduction
+    int block_size = min(30, ext_n / 2);
+    bkz_reduction(fplll_mat, BKZ_VERBOSE, block_size);
+    
+    // Extract null space basis
+    vector<VectorXi> basis_vectors;
+    
+    for (int j = 0; j < ext_n; j++) {
+        bool is_null = true;
+        for (int i = 0; i < m; i++) {
+            if (fplll_mat[j][i] != 0) {
+                is_null = false;
+                break;
+            }
+        }
+        
+        if (is_null) {
+            VectorXi col(n + 1);
+            for (int i = 0; i < n + 1; i++) {
+                col(i) = fplll_mat[j][m + i].get_si();
+            }
+            basis_vectors.push_back(col);
+        }
+    }
+    
+    // Convert to matrix
+    basis.resize(n_basis, n + 1);
+    for (int i = 0; i < n_basis; i++) {
+        basis.row(i) = basis_vectors[i];
+    }
+}
+
+void MarketSplit::get_gso() {
+    b_hat.resize(n_basis, n + 1);
+    mu.resize(n_basis, n_basis);
+    b_hat_norms_sq.resize(n_basis);
+    
+    mu.setZero();
+    
+    for (int i = 0; i < n_basis; i++) {
+        b_hat.row(i) = basis.row(i).cast<double>();
+        
+        for (int j = 0; j < i; j++) {
+            mu(i, j) = basis.row(i).cast<double>().dot(b_hat.row(j)) / b_hat_norms_sq(j);
+            b_hat.row(i) -= mu(i, j) * b_hat.row(j);
+        }
+        
+        mu(i, i) = 1.0;
+        b_hat_norms_sq(i) = b_hat.row(i).squaredNorm();
+    }
+}
+
+void MarketSplit::compute_dual_norms() {
+    MatrixXd B = basis.cast<double>().transpose();
+    MatrixXd B_T = basis.cast<double>();
+    MatrixXd gram = B_T * B;
+    MatrixXd gram_inv = gram.inverse();
+    b_bar = (B * gram_inv).transpose();
+    
+    b_bar_norms_l2.resize(n_basis);
+    b_bar_norms_l1.resize(n_basis);
+    
+    for (int i = 0; i < n_basis; i++) {
+        b_bar_norms_l2(i) = b_bar.row(i).norm();
+        b_bar_norms_l1(i) = b_bar.row(i).lpNorm<1>();
+    }
+}
+
+bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, 
+                           vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds) {
+    backtrack_loops++;
+    
+    if (idx == -1) {
+        dive_loops++;
+        
+        VectorXd v = VectorXd::Zero(n + 1);
+        for (int i = 0; i < n_basis; i++) {
+            v += u_values[i] * basis.row(i).cast<double>();
+        }
+        
+        if (abs(v(n) - rmax) < 1e-10) {
+            bool valid = true;
+            for (int i = 0; i < n; i++) {
+                if (v(i) < -rmax - 1e-10 || v(i) > rmax + 1e-10) {
+                    valid = false;
+                    break;
+                }
+            }
+            
+            if (valid) {
+                VectorXi x(n);
+                for (int i = 0; i < n; i++) {
+                    x(i) = static_cast<int>(round((v(i) + rmax) / (2 * c(i))));
+                }
+                
+                if ((A * x - d).norm() < 1e-10) {
+                    if (first_solution_time == 0.0) {
+                        first_sol_bt_loops = backtrack_loops;
+                    }
+                    
+                    solutions.push_back(x);
+                    if (max_sols > 0 && static_cast<int>(solutions.size()) >= max_sols) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    
+    // First pruning condition
+    if (prev_w_norm_sq > c + 1e-10) {
+        dive_loops++;
+        first_pruning_count++;
+        return false;
+    }
+    
+    // Compute mu_sum
+    double mu_sum = 0.0;
+    for (int j = idx + 1; j < n_basis; j++) {
+        mu_sum += u_values[j] * mu(j, idx);
+    }
+    
+    // First pruning bounds
+    double bound_sq = (c - prev_w_norm_sq) / b_hat_norms_sq(idx);
+    double bound = sqrt(max(0.0, bound_sq));
+    
+    int u_min_pruning1 = static_cast<int>(floor(-bound - mu_sum));
+    int u_max_pruning1 = static_cast<int>(ceil(bound - mu_sum));
+    
+    // Second pruning bounds
+    int u_min_pruning2 = static_cast<int>(floor(-u_global_bounds(idx)));
+    int u_max_pruning2 = static_cast<int>(ceil(u_global_bounds(idx)));
+    
+    int u_min = max(u_min_pruning1, u_min_pruning2);
+    int u_max = min(u_max_pruning1, u_max_pruning2);
+    
+    int original_range = u_max_pruning1 - u_min_pruning1 + 1;
+    int final_range = max(0, u_max - u_min + 1);
+    
+    if (final_range < original_range) {
+        second_pruning_count++;
+    }
+    
+    // Third pruning strategy
+    for (int u_val = u_min; u_val <= u_max; u_val++) {
+        u_values[idx] = u_val;
+        
+        double coeff = u_val + mu_sum;
+        VectorXd curr_w = coeff * b_hat.row(idx).transpose() + prev_w;
+        
+        double w_norm_sq = coeff * coeff * b_hat_norms_sq(idx) + prev_w_norm_sq;
+        double w_norm_l1 = curr_w.lpNorm<1>();
+        
+        if (w_norm_sq > rmax * w_norm_l1 + 1e-10) {
+            if (coeff > 0) {
+                third_pruning_count += (u_max - u_val);
+                break;
+            }
+            third_pruning_count++;
+            continue;
+        }
+        
+        if (backtrack(idx - 1, u_values, curr_w, w_norm_sq, solutions, c, u_global_bounds)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+vector<VectorXi> MarketSplit::enumerate() {
+    vector<VectorXi> solutions;
+    double c = (n + 1) * rmax * rmax;
+    
+    // Global bounds
+    double sqrt_c = sqrt(c);
+    VectorXd u_global_bounds(n_basis);
+    for (int i = 0; i < n_basis; i++) {
+        u_global_bounds(i) = min(b_bar_norms_l2(i) * sqrt_c, b_bar_norms_l1(i) * rmax);
+    }
+    
+    vector<int> u_values(n_basis, 0);
+    VectorXd initial_w = VectorXd::Zero(n + 1);
+    
+    backtrack(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
+    
+    return solutions;
+}
+
+SolveResult ms_run(const MatrixXi& A, const VectorXi& d, const string& instance_id, const VectorXi* opt_sol, int max_sols, bool debug) {
+    auto start_time = high_resolution_clock::now();
     
     try {
-        MSData ms_data(data_path, sol_path);
-        cout << "Loaded " << ms_data.size() << " instances" << endl;
+        auto init_start = high_resolution_clock::now();
+        MarketSplit ms(A, d, VectorXi(), max_sols, debug);
+        auto init_end = high_resolution_clock::now();
+        double init_time = duration<double>(init_end - init_start).count();
         
-        vector<int> test_m_values = {3, 4, 5, 6, 7};
-        vector<SolveResult> all_results;
+        vector<VectorXi> solutions = ms.enumerate();
+        auto end_time = high_resolution_clock::now();
+        double solve_time = duration<double>(end_time - start_time).count();
         
-        for (int m : test_m_values) {
-            auto m_instances = ms_data.get_by_m(m);
-            cout << "Testing " << m_instances.size() << " instances with m = " << m << endl;
-            
-            for (const auto* inst : m_instances) {
-                const VectorXi* opt_sol = ms_data.get_solution(inst->id);
-                auto result = ms_run(inst->A, inst->d, inst->id, opt_sol, max_sols, debug);
-                all_results.push_back(result);
-                
-                string status = result.success ? "✓" : "✗";
-                string opt_status = result.optimal_found ? "✓" : "✗";
-                
-                cout << fixed << setprecision(4)
-                     << status << " " << result.id << ": " << result.solutions_count << " solutions, "
-                     << "optimal: " << opt_status << ", bt_loops: " << result.backtrack_loops << ", "
-                     << "dive_loops: " << result.dive_loops << ", 1st_prune: " << result.first_pruning_count << ", "
-                     << "2nd_prune: " << result.second_pruning_count << ", 3rd_prune: " << result.third_pruning_count << ", "
-                     << "time: " << result.solve_time << "s, "
-                     << "1st_sol: " << result.first_solution_time << "s, 1st_bt: " << result.first_sol_bt_loops << ", "
-                     << "init: " << result.init_time << "s" << endl;
-            }
-            cout << endl;
-        }
-        
-        // Generate log file
-        auto now = system_clock::now();
-        auto time_t_now = system_clock::to_time_t(now);
-        auto tm_now = *localtime(&time_t_now);
-        
-        stringstream ss;
-        ss << "res_";
-        for (size_t i = 0; i < test_m_values.size(); i++) {
-            if (i > 0) ss << "_";
-            ss << test_m_values[i];
-        }
-        ss << "_" << tm_now.tm_mday << "d" << tm_now.tm_hour << "h" 
-           << tm_now.tm_min << "m" << tm_now.tm_sec << "s.log";
-        
-        string log_filename = ss.str();
-        ofstream log_file(log_filename);
-        
-        print_and_log(string(136, '='), log_file);
-        print_and_log("RESULTS", log_file);
-        print_and_log(string(136, '='), log_file);
-        print_and_log("", log_file);
-        
-        // Table header
-        stringstream header;
-        header << left << setw(15) << "ID" 
-               << setw(8) << "Size"
-               << setw(8) << "Status"
-               << setw(8) << "Optimal"
-               << setw(10) << "Time(s)"
-               << setw(10) << "1st_Sol(s)"
-               << setw(10) << "1st_Prune"
-               << setw(10) << "2nd_Prune"
-               << setw(10) << "3rd_Prune"
-               << setw(10) << "Init(s)"
-               << setw(10) << "Solutions"
-               << setw(8) << "1st_BT"
-               << setw(12) << "BT_Loops"
-               << setw(12) << "Dive_Loops";
-        
-        print_and_log(header.str(), log_file);
-        print_and_log(string(136, '-'), log_file);
-        
-        for (const auto& result : all_results) {
-            stringstream row;
-            // Find the instance to get actual size
-            const Instance* inst = ms_data.get(result.id);
-            string size = inst ? ("(" + to_string(inst->m) + "," + to_string(inst->n) + ")") : "(?,?)";
-            string status = result.success ? "SUCCESS" : "FAILED";
-            string optimal = result.optimal_found ? "✓" : "✗";
-            
-            row << left << setw(15) << result.id
-                << setw(8) << size
-                << setw(8) << status
-                << setw(8) << optimal
-                << fixed << setprecision(4)
-                << setw(10) << result.solve_time
-                << setw(10) << result.first_solution_time
-                << setw(10) << result.first_pruning_count
-                << setw(10) << result.second_pruning_count
-                << setw(10) << result.third_pruning_count
-                << setw(10) << result.init_time
-                << setw(10) << result.solutions_count
-                << setw(8) << result.first_sol_bt_loops
-                << setw(12) << result.backtrack_loops
-                << setw(12) << result.dive_loops;
-            
-            print_and_log(row.str(), log_file);
-        }
-        
-        print_and_log("", log_file);
-        print_and_log(string(136, '='), log_file);
-        log_file.close();
-        
-        cout << "Results saved to " << log_filename << endl;
-        
-        // Save solutions
-        string sol_filename = log_filename;
-        sol_filename.replace(sol_filename.find(".log"), 4, ".sol");
-        
-        ofstream sol_file(sol_filename);
-        for (const auto& result : all_results) {
-            if (result.success && !result.solutions.empty()) {
-                sol_file << "=======" << result.id << "=============" << endl;
-                for (size_t i = 0; i < result.solutions.size(); i++) {
-                    sol_file << "-----------" << (i + 1) << "-th solution------------" << endl;
-                    for (int j = 0; j < result.solutions[i].size(); j++) {
-                        if (j > 0) sol_file << " ";
-                        sol_file << result.solutions[i](j);
-                    }
-                    sol_file << endl;
+        bool found_opt = false;
+        if (opt_sol != nullptr) {
+            for (const auto& sol : solutions) {
+                if (sol.isApprox(*opt_sol)) {
+                    found_opt = true;
+                    break;
                 }
-                sol_file << endl;
             }
         }
-        sol_file.close();
         
-        cout << "Solutions saved to " << sol_filename << endl;
-        
+        return {
+            instance_id,
+            static_cast<int>(solutions.size()),
+            solutions,
+            found_opt,
+            ms.get_backtrack_loops(),
+            ms.get_dive_loops(),
+            ms.get_first_sol_bt_loops(),
+            ms.get_first_pruning_count(),
+            ms.get_second_pruning_count(),
+            ms.get_third_pruning_count(),
+            solve_time,
+            ms.get_first_solution_time(),
+            init_time,
+            true,
+            ""
+        };
     } catch (const exception& e) {
-        cerr << "Error: " << e.what() << endl;
-        return 1;
+        return {
+            instance_id, 0, {}, false, 0, 0, 0, 0, 0, 0, 0.0, 0.0, 0.0, false, e.what()
+        };
     }
-    
-    return 0;
 }
