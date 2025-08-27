@@ -177,7 +177,7 @@ void MarketSplit::get_extended_matrix() {
     }
     
     // Create extended matrix L
-    int pows = to_string(A.cwiseAbs().maxCoeff()).length() + to_string(d.cwiseAbs().maxCoeff()).length() + 2;
+    int pows = to_string(A.cwiseAbs().maxCoeff()).length() + to_string(d.cwiseAbs().maxCoeff()).length() - 1;
     int N = static_cast<int>(pow(10, pows));
     
     L.resize(m + n + 1, n + 1);
@@ -423,13 +423,13 @@ bool MarketSplit::verify_gso(double tol) const {
         for (int j = i + 1; j < n_basis; j++) {
             double dot_product = b_hat.row(i).dot(b_hat.row(j));
             if (abs(dot_product) > tol) {
-                if (debug) cout << "Orthogonality failed: b_hat[" << i << "] · b_hat[" << j << "] = " << dot_product << endl;
+                if (debug) cout << "Orthogonality failed: b_hat[" << i << "] Â· b_hat[" << j << "] = " << dot_product << endl;
                 return false;
             }
         }
     }
     for (int i = 0; i < n_basis; i++) {
-        VectorXd reconstructed = b_hat.row(i);
+        RowVectorXd reconstructed = b_hat.row(i);
         for (int j = 0; j < i; j++) {
             reconstructed += mu(i, j) * b_hat.row(j);
         }
