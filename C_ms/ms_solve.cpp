@@ -117,6 +117,16 @@ vector<const Instance*> MSData::get_by_size(int m, int n) const {
     return result;
 }
 
+vector<const Instance*> MSData::get_by_m(int m) const {
+    vector<const Instance*> result;
+    for (const auto& inst : data) {
+        if (inst.m == m) {
+            result.push_back(&inst);
+        }
+    }
+    return result;
+}
+
 const VectorXi* MSData::get_solution(const string& id) const {
     auto it = solutions.find(id);
     return (it != solutions.end()) ? &it->second : nullptr;

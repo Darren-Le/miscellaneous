@@ -31,6 +31,7 @@ public:
     MSData(const string& data_path, const string& sol_path);
     const Instance* get(const string& id) const;
     vector<const Instance*> get_by_size(int m, int n) const;
+    vector<const Instance*> get_by_m(int m) const;
     const VectorXi* get_solution(const string& id) const;
     size_t size() const { return data.size(); }
 };
