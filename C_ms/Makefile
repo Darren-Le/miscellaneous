@@ -8,6 +8,14 @@ SOURCES = ms_solve.cpp main.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 TARGET = ms_solver
 
+
+
+# Debug configuration
+CXXFLAGS_DEBUG = -std=c++17 -g -O0 -DDEBUG
+TARGET_DEBUG = ms_solver_debug
+OBJECTS_DEBUG = $(SOURCES:.cpp=.debug.o)
+
+
 # Default target
 all: $(TARGET)
 
@@ -17,5 +25,14 @@ $(TARGET): $(OBJECTS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
+# Debug target
+debug: $(TARGET_DEBUG)
+
+$(TARGET_DEBUG): $(OBJECTS_DEBUG)
+	$(CXX) -o $@ $^ $(LIBS)
+
+%.debug.o: %.cpp
+	$(CXX) $(CXXFLAGS_DEBUG) $(INCLUDES) -c $< -o $@
+
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJECTS) $(OBJECTS_DEBUG) $(TARGET) $(TARGET_DEBUG)
