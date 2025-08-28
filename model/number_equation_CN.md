@@ -81,7 +81,7 @@ model.SetObjective(1, OPTVSense.MINIMIZE)
 model.Optimize()
 
 # 输出求解结果
-if model.Status == OPTV_OPTIMAL:
+if model.STATUS == OPTV_OPTIMAL:
     print('a =', a.X)
     print('b =', b.X) 
     print('c =', c.X)
@@ -169,7 +169,7 @@ model.SetObjective(1, OPTVSense.MINIMIZE)
 model.Optimize()
 
 # 输出求解结果
-if model.Status == OPTV_OPTIMAL:
+if model.STATUS == OPTV_OPTIMAL:
     print('a =', a.X)
     print('b =', b.X)
     print('c =', c.X)
@@ -279,7 +279,7 @@ model.SetObjective(1, OPTVSense.MINIMIZE)
 model.Optimize()
 
 # 输出求解结果
-if model.Status == OPTV_OPTIMAL:
+if model.STATUS == OPTV_OPTIMAL:
     print('a =', a.X)
     print('b =', b.X)
     print('c =', c.X)
@@ -315,7 +315,7 @@ x = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="x")
 ### 状态检查
 使用`OPTV_OPTIMAL`检查最优解状态：
 ```python
-if model.Status == OPTV_OPTIMAL:
+if model.STATUS == OPTV_OPTIMAL:
     print("找到最优解")
 ```
 
