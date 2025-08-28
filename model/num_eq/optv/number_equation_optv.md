@@ -90,7 +90,7 @@ model.AddQConstr(c - m3 * (a + b), -OPTV_INF, 0.0, name="c_constraint_rhs")
 model.AddQConstr(c - m3 * (a + b), 0.0, OPTV_INF, name="c_constraint_lhs")
 
 # 设置目标函数
-model.SetObjective(1, OPTV_MINIMIZE)
+model.SetObjective(1, OPTVSense.MINMIZE)
 
 # 求解模型
 model.Optimize()
@@ -196,7 +196,7 @@ rhs = 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc)
 model.AddConstr(lhs - rhs == 0, name="main_constraint")
 
 # 设置目标函数
-model.SetObjective(1, OPTV_MINIMIZE)
+model.SetObjective(1, OPTVSense.MINMIZE)
 
 # 求解模型
 model.Optimize()
@@ -338,7 +338,7 @@ rhs = 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc)
 model.AddConstr(lhs - rhs == 0, name="main_constraint")
 
 # 设置目标函数
-model.SetObjective(1, OPTV_MINIMIZE)
+model.SetObjective(1, OPTVSense.MINMIZE)
 
 # 求解模型
 model.Optimize()
