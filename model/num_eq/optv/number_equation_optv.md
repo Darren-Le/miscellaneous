@@ -187,10 +187,11 @@ model.AddQConstr(abc - ab * c, -OPTV_INF, 0.0, name="abc_constraint_rhs")
 model.AddQConstr(abc - ab * c, 0.0, OPTV_INF, name="abc_constraint_lhs")
 
 # 构造左边项式
-lhs = a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2
-
+model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, -OPTV_INF, 0.0, name="lhs_rhs")
+model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, 0.0, OPTV_INF, name="lhs_lhs")
 # 构造右边项式  
-rhs = 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc)
+model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), -OPTV_INF, 0.0, name="rhs_rhs")
+model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), 0.0, OPTV_INF, name="rhs_lhs")
 
 # 主要约束：左边等于右边
 model.AddConstr(lhs - rhs == 0, name="main_constraint")
@@ -330,10 +331,12 @@ model.AddConstr(u1 >= 1, name="u1_abs")
 model.AddConstr(u2 >= 1, name="u2_abs")
 model.AddConstr(u3 >= 1, name="u3_abs")
 
-# 构造左边和右边表达式
-lhs = a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2
-rhs = 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc)
-
+# 构造左边项式
+model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, -OPTV_INF, 0.0, name="lhs_rhs")
+model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, 0.0, OPTV_INF, name="lhs_lhs")
+# 构造右边项式  
+model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), -OPTV_INF, 0.0, name="rhs_rhs")
+model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), 0.0, OPTV_INF, name="rhs_lhs")
 # 主要约束
 model.AddConstr(lhs - rhs == 0, name="main_constraint")
 
