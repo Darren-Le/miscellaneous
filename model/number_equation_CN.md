@@ -63,13 +63,16 @@ m3 = model.AddVar(lb=0, vtype=OPTV_CONTINUOUS, name="m3")
 model.AddConstr(m1 + m2 + m3 == 4, name="sum_constraint")
 
 # a = m1 * (b + c)
-model.AddQConstr(a - m1 * (b + c) == 0, name="a_constraint")
+model.AddQConstr(a - m1 * (b + c), -OPTV_INF, 0.0, name="a_constraint_ub")
+model.AddQConstr(a - m1 * (b + c), 0.0, OPTV_INF, name="a_constraint_lb")
 
 # b = m2 * (c + a) 
-model.AddQConstr(b - m2 * (c + a) == 0, name="b_constraint")
+model.AddQConstr(b - m2 * (c + a), -OPTV_INF, 0.0, name="b_constraint_ub")
+model.AddQConstr(b - m2 * (c + a), 0.0, OPTV_INF, name="b_constraint_lb")
 
 # c = m3 * (a + b)
-model.AddQConstr(c - m3 * (a + b) == 0, name="c_constraint")
+model.AddQConstr(c - m3 * (a + b), -OPTV_INF, 0.0, name="c_constraint_ub")
+model.AddQConstr(c - m3 * (a + b), 0.0, OPTV_INF, name="c_constraint_lb")
 
 # 设置目标函数
 model.SetObjective(1, OPTV_MINIMIZE)
@@ -131,21 +134,30 @@ bc = model.AddVar(vtype=OPTV_INTEGER, name="bc")      # b*c
 abc = model.AddVar(vtype=OPTV_INTEGER, name="abc")    # a*b*c
 
 # 辅助变量约束
-model.AddQConstr(aa - a * a == 0, name="aa_def")
-model.AddQConstr(bb - b * b == 0, name="bb_def")
-model.AddQConstr(cc - c * c == 0, name="cc_def")
-model.AddQConstr(ab - a * b == 0, name="ab_def")
-model.AddQConstr(ac - a * c == 0, name="ac_def")
-model.AddQConstr(bc - b * c == 0, name="bc_def")
-model.AddQConstr(abc - ab * c == 0, name="abc_def")
+model.AddQConstr(aa - a * a, -OPTV_INF, 0.0, name="aa_def_ub")
+model.AddQConstr(aa - a * a, 0.0, OPTV_INF, name="aa_def_lb")
+model.AddQConstr(bb - b * b, -OPTV_INF, 0.0, name="bb_def_ub")
+model.AddQConstr(bb - b * b, 0.0, OPTV_INF, name="bb_def_lb")
+model.AddQConstr(cc - c * c, -OPTV_INF, 0.0, name="cc_def_ub")
+model.AddQConstr(cc - c * c, 0.0, OPTV_INF, name="cc_def_lb")
+model.AddQConstr(ab - a * b, -OPTV_INF, 0.0, name="ab_def_ub")
+model.AddQConstr(ab - a * b, 0.0, OPTV_INF, name="ab_def_lb")
+model.AddQConstr(ac - a * c, -OPTV_INF, 0.0, name="ac_def_ub")
+model.AddQConstr(ac - a * c, 0.0, OPTV_INF, name="ac_def_lb")
+model.AddQConstr(bc - b * c, -OPTV_INF, 0.0, name="bc_def_ub")
+model.AddQConstr(bc - b * c, 0.0, OPTV_INF, name="bc_def_lb")
+model.AddQConstr(abc - ab * c, -OPTV_INF, 0.0, name="abc_def_ub")
+model.AddQConstr(abc - ab * c, 0.0, OPTV_INF, name="abc_def_lb")
 
 # 左边：a^3 + a^2*b + a^2*c + 3*a*b*c + a*b^2 + b^3 + b^2*c + b*c^2 + a*c^2 + c^3
 lhs = model.AddVar(vtype=OPTV_INTEGER, name="lhs")
-model.AddQConstr(lhs - (aa * a + aa * b + aa * c + 3 * abc + ab * b + bb * b + bb * c + bc * c + ac * c + cc * c) == 0, name="lhs_def")
+model.AddQConstr(lhs - (aa * a + aa * b + aa * c + 3 * abc + ab * b + bb * b + bb * c + bc * c + ac * c + cc * c), -OPTV_INF, 0.0, name="lhs_def_ub")
+model.AddQConstr(lhs - (aa * a + aa * b + aa * c + 3 * abc + ab * b + bb * b + bb * c + bc * c + ac * c + cc * c), 0.0, OPTV_INF, name="lhs_def_lb")
 
 # 右边：4 * (a^2*b + a^2*c + b^2*a + b^2*c + b*c^2 + a*c^2 + 2*a*b*c)
 rhs = model.AddVar(vtype=OPTV_INTEGER, name="rhs")
-model.AddConstr(rhs == 4 * (aa * b + aa * c + bb * a + bb * c + bc * c + ac * c + 2 * abc), name="rhs_def")
+model.AddQConstr(rhs - 4 * (aa * b + aa * c + bb * a + bb * c + bc * c + ac * c + 2 * abc), -OPTV_INF, 0.0, name="rhs_def_ub")
+model.AddQConstr(rhs - 4 * (aa * b + aa * c + bb * a + bb * c + bc * c + ac * c + 2 * abc), 0.0, OPTV_INF, name="rhs_def_lb")
 
 # 主约束：lhs = rhs
 model.AddConstr(lhs == rhs, name="main_constraint")
@@ -217,13 +229,20 @@ abs_ac = model.AddVar(lb=0, vtype=OPTV_INTEGER, name="abs_ac")
 abs_bc = model.AddVar(lb=0, vtype=OPTV_INTEGER, name="abs_bc")
 
 # 辅助变量约束
-model.AddQConstr(aa - a * a == 0, name="aa_def")
-model.AddQConstr(bb - b * b == 0, name="bb_def")
-model.AddQConstr(cc - c * c == 0, name="cc_def")
-model.AddQConstr(ab - a * b == 0, name="ab_def")
-model.AddQConstr(ac - a * c == 0, name="ac_def")
-model.AddQConstr(bc - b * c == 0, name="bc_def")
-model.AddQConstr(abc - ab * c == 0, name="abc_def")
+model.AddQConstr(aa - a * a, -OPTV_INF, 0.0, name="aa_def_ub")
+model.AddQConstr(aa - a * a, 0.0, OPTV_INF, name="aa_def_lb")
+model.AddQConstr(bb - b * b, -OPTV_INF, 0.0, name="bb_def_ub")
+model.AddQConstr(bb - b * b, 0.0, OPTV_INF, name="bb_def_lb")
+model.AddQConstr(cc - c * c, -OPTV_INF, 0.0, name="cc_def_ub")
+model.AddQConstr(cc - c * c, 0.0, OPTV_INF, name="cc_def_lb")
+model.AddQConstr(ab - a * b, -OPTV_INF, 0.0, name="ab_def_ub")
+model.AddQConstr(ab - a * b, 0.0, OPTV_INF, name="ab_def_lb")
+model.AddQConstr(ac - a * c, -OPTV_INF, 0.0, name="ac_def_ub")
+model.AddQConstr(ac - a * c, 0.0, OPTV_INF, name="ac_def_lb")
+model.AddQConstr(bc - b * c, -OPTV_INF, 0.0, name="bc_def_ub")
+model.AddQConstr(bc - b * c, 0.0, OPTV_INF, name="bc_def_lb")
+model.AddQConstr(abc - ab * c, -OPTV_INF, 0.0, name="abc_def_ub")
+model.AddQConstr(abc - ab * c, 0.0, OPTV_INF, name="abc_def_lb")
 
 # 和变量约束
 model.AddConstr(sum_ab == a + b, name="sum_ab_def")
@@ -247,8 +266,10 @@ model.AddConstr(abs_bc >= 1, name="nonzero_bc")
 lhs = model.AddVar(vtype=OPTV_INTEGER, name="lhs")
 rhs = model.AddVar(vtype=OPTV_INTEGER, name="rhs")
 
-model.AddQConstr(lhs - (aa * a + aa * b + aa * c + 3 * abc + ab * b + bb * b + bb * c + bc * c + ac * c + cc * c) == 0, name="lhs_def")
-model.AddConstr(rhs == 4 * (aa * b + aa * c + bb * a + bb * c + bc * c + ac * c + 2 * abc), name="rhs_def")
+model.AddQConstr(lhs - (aa * a + aa * b + aa * c + 3 * abc + ab * b + bb * b + bb * c + bc * c + ac * c + cc * c), -OPTV_INF, 0.0, name="lhs_def_ub")
+model.AddQConstr(lhs - (aa * a + aa * b + aa * c + 3 * abc + ab * b + bb * b + bb * c + bc * c + ac * c + cc * c), 0.0, OPTV_INF, name="lhs_def_lb")
+model.AddQConstr(rhs - 4 * (aa * b + aa * c + bb * a + bb * c + bc * c + ac * c + 2 * abc), -OPTV_INF, 0.0, name="rhs_def_ub")
+model.AddQConstr(rhs - 4 * (aa * b + aa * c + bb * a + bb * c + bc * c + ac * c + 2 * abc), 0.0, OPTV_INF, name="rhs_def_lb")
 model.AddConstr(lhs == rhs, name="main_constraint")
 
 # 设置目标函数
@@ -272,6 +293,32 @@ else:
     print("模型未找到最优解")
 ```
 
+## OptVerse求解器使用要点
+
+### 二次约束格式
+OptVerse的二次约束不能使用等式形式，需要拆分为上下界约束：
+```python
+# 错误格式
+model.AddQConstr(expr == 0, name="constraint")
+
+# 正确格式
+model.AddQConstr(expr, -OPTV_INF, 0.0, name="constraint_ub")
+model.AddQConstr(expr, 0.0, OPTV_INF, name="constraint_lb")
+```
+
+### 变量界限设置
+对于无界变量，需要显式设置：
+```python
+x = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="x")
+```
+
+### 状态检查
+使用`OPTV_OPTIMAL`检查最优解状态：
+```python
+if model.Status == OPTV_OPTIMAL:
+    print("找到最优解")
+```
+
 ## 结论
 
 本案例展示了如何将数论方程问题转换为数学规划模型。通过三种不同的转换方法：
@@ -284,6 +331,6 @@ else:
 - 分式约束到二次约束的转换
 - 高次项通过辅助变量的线性化
 - 不等式约束的绝对值转换
-- 非凸二次约束的处理
+- OptVerse特有的二次约束格式处理
 
-这些转换方法在实际的数学规划建模中非常有用。
+这些转换方法在实际的数学规划建模中非常有用，特别是在处理非线性约束时。
