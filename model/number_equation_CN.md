@@ -293,32 +293,6 @@ else:
     print("模型未找到最优解")
 ```
 
-## OptVerse求解器使用要点
-
-### 二次约束格式
-OptVerse的二次约束不能使用等式形式，需要拆分为上下界约束：
-```python
-# 错误格式
-model.AddQConstr(expr == 0, name="constraint")
-
-# 正确格式
-model.AddQConstr(expr, -OPTV_INF, 0.0, name="constraint_ub")
-model.AddQConstr(expr, 0.0, OPTV_INF, name="constraint_lb")
-```
-
-### 变量界限设置
-对于无界变量，需要显式设置：
-```python
-x = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="x")
-```
-
-### 状态检查
-使用`OPTV_OPTIMAL`检查最优解状态：
-```python
-if model.STATUS == OPTV_OPTIMAL:
-    print("找到最优解")
-```
-
 ## 结论
 
 本案例展示了如何将数论方程问题转换为数学规划模型。通过三种不同的转换方法：
