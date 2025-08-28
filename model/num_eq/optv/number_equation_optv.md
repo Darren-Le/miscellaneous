@@ -1,4 +1,4 @@
-# 数论方程的数学规划模型 (OptVerse版本)
+# 数论方程问题 (非凸MIQCP)
 
 示例为刘兴禄主编《数学建模与数学规划:方法、案例及编程实践(Python + COPT/Gurobi实现)》第六章的案例，我们将该问题建模，并使用OptVerse求解器进行求解。
 
@@ -45,17 +45,16 @@ $$
 
 综上，可以等价为下面的混合整数二次约束规划模型（MIQCP）：
 
-$\min 1$
-
-s．t．$\quad m_1+m_2+m_3=4$
 $$
 \begin{array}{ll}
-x_1=m_1\left(x_2+x_3\right) & \\
-x_2=m_2\left(x_1+x_3\right) & \\
-x_3=m_3\left(x_1+x_2\right) & \\
-m_i \geqslant 0, & \forall i=1,2,3 \\
-x_i \geqslant 1, & \forall i=1,2,3 \\
-x_i \in \mathbb{Z}_{+}, & \forall i=1,2,3
+\min & 1\\
+\text{s.t．}& m_1+m_2+m_3=4\\
+& x_1=m_1\left(x_2+x_3\right)  \\
+& x_2=m_2\left(x_1+x_3\right)  \\
+& x_3=m_3\left(x_1+x_2\right)  \\
+& m_i \geqslant 0,  \forall i=1,2,3 \\
+& x_i \geqslant 1,  \forall i=1,2,3 \\
+& x_i \in \mathbb{Z}_{+},  \forall i=1,2,3
 \end{array}
 $$
 
@@ -160,9 +159,6 @@ m1 = model.AddVar(vtype=OPTV_INTEGER, name="m1")
 m2 = model.AddVar(vtype=OPTV_INTEGER, name="m2") 
 m3 = model.AddVar(vtype=OPTV_INTEGER, name="m3") 
 m4 = model.AddVar(vtype=OPTV_INTEGER, name="m4") 
-m5 = model.AddVar(vtype=OPTV_INTEGER, name="m5") 
-m6 = model.AddVar(vtype=OPTV_INTEGER, name="m6") 
-m7 = model.AddVar(vtype=OPTV_INTEGER, name="m7")
 lhs = model.AddVar(vtype=OPTV_INTEGER, name="lhs")
 rhs = model.AddVar(vtype=OPTV_INTEGER, name="rhs")
 
@@ -179,15 +175,10 @@ model.AddQConstr(m3 - c * c, 0.0, OPTV_INF, name="c_squared_lhs")
 model.AddQConstr(m4 - a * b, -OPTV_INF, 0.0, name="ab_rhs")
 model.AddQConstr(m4 - a * b, 0.0, OPTV_INF, name="ab_lhs")
 
-model.AddQConstr(m5 - a * c, -OPTV_INF, 0.0, name="ac_rhs")
-model.AddQConstr(m5 - a * c, 0.0, OPTV_INF, name="ac_lhs")
-
-model.AddQConstr(m6 - b * c, -OPTV_INF, 0.0, name="bc_rhs")
-model.AddQConstr(m6 - b * c, 0.0, OPTV_INF, name="bc_lhs")
-
 # 左端项
 model.AddQConstr(lhs - (m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c), -OPTV_INF, 0.0, name="lhs_rhs") 
 model.AddQConstr(lhs - (m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c), 0.0, OPTV_INF, name="lhs_lhs")
+
 # 右端项
 model.AddQConstr(rhs - 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c), -OPTV_INF, 0.0, name="rhs_rhs") 
 model.AddQConstr(rhs - 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c), 0.0, OPTV_INF, name="rhs_lhs") 
@@ -288,9 +279,6 @@ m1 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m1")
 m2 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m2")
 m3 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m3")
 m4 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m4")
-m5 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m5")
-m6 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m6")
-m7 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m7")
 
 # 用于处理绝对值约束的辅助变量
 u1 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="u1")
@@ -315,12 +303,6 @@ model.AddQConstr(m3 - c * c, 0.0, OPTV_INF, name="c_squared_lhs")
 
 model.AddQConstr(m4 - a * b, -OPTV_INF, 0.0, name="ab_rhs")
 model.AddQConstr(m4 - a * b, 0.0, OPTV_INF, name="ab_lhs")
-
-model.AddQConstr(m5 - a * c, -OPTV_INF, 0.0, name="ac_rhs")
-model.AddQConstr(m5 - a * c, 0.0, OPTV_INF, name="ac_lhs")
-
-model.AddQConstr(m6 - b * c, -OPTV_INF, 0.0, name="bc_rhs")
-model.AddQConstr(m6 - b * c, 0.0, OPTV_INF, name="bc_lhs")
 
 # 定义u变量
 model.AddConstr(u1 - a - b == 0, name="u1_def")
@@ -363,8 +345,6 @@ if model.STATUS == OPTV_OPTIMAL:
     if (b_val + c_val) != 0 and (a_val + c_val) != 0 and (a_val + b_val) != 0:
         result = a_val/(b_val+c_val) + b_val/(a_val+c_val) + c_val/(a_val+b_val)
         print('验证：a/(b+c) + b/(a+c) + c/(a+b) =', result)
-    else:
-        print('分母为零，解无效')
 else:
     print('未找到最优解，求解状态：', model.STATUS)
 ```
@@ -398,7 +378,7 @@ $$
 
 其中，$k$ 是任意非0整数。可以通过变化 $k$ 的值来观察问题的求解难度变化。当 $k=1$ 时，模型无可行解。当 $k=2$ 时，OptVerse可以很快得到一个可行解：$a=1, b=1, c=3$ 。
 
-## 5. 总结
+## 5. 结论
 
 本章以一个数论方程为例讲解了如何将一些看似与优化无关的问题建模为数学规划模型。在模型转换的过程中，需要用到许多有用的模型转化方法，包括将分式约束转换为二次约束、将三次约束转换为二次约束、将 $\neq$ 约束转换为绝对值约束等。
 
