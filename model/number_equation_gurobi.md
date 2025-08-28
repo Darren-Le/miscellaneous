@@ -1,7 +1,8 @@
-第6章 数论方程的数学规划模型
+# 第6章 数论方程的数学规划模型
 
 数学规划应用十分广泛，许多问题看似与其无关，但可以通过巧妙转换，将其变成数学规划问题加以解决。本章以一个有趣的数论方程问题来介绍如何将数论方程转换为数学规划模型，并提供完整的实现代码。
-6.1 问题简介
+
+## 6.1 问题简介
 
 本章探讨的数论方程问题源自一个网络上流传一时的故事。有一家比萨店为了宣传和促销，提出了一个新颖的方案：出一道有趣的数学题吸引人们来解，成功解题者可免费获得一份比萨大礼包！店家经过精挑细选，选中了下面这道题。
 
@@ -29,7 +30,8 @@ $$
 其中，$x_i$ 为满足方程的正整数解。
 
 在上述模型中，约束式（6．3）含有分式，不可以直接使用COPT或Gurobi来求解。不过，可以通过模型转换，将其转换为求解器可以求解的形式。下面介绍两种转换的方法。
-6.2 方法1：引入辅助变量进行转换
+
+## 6.2 方法1：引入辅助变量进行转换
 
 引入辅助变量 $m_1 、 m_2 、 m_3$ ，分别令其等于约束式（6．3）左端的3个部分，化简可得：
 $$
@@ -153,7 +155,8 @@ k=4.00000000184069 \neq 4
 $$
 
 出人意料的是，Gurobi得到的结果有非常微小的误差！这种现象实际上是模型求解中比较常见的数值问题，因为编程语言的数值精度有限。Gurobi中模型可行性的默认容差为 $1 \times 10^{-6}$ ，即若一组解使得约束的违背量小于等于 $1 \times 10^{-6}$ ，Gurobi就会判定该解为可行解（10），但是实际上该解是否真正可行，是否存在数值问题，需要进行进一步的验证。若要获得精度更高的解，可以设置相关的容差参数。不过，本章将尝试使用另外一种模型转换的方法来提高求解精度，也就是接下来要介绍的方法 2 。
-6.3 方法2：消去除法运算
+
+## 6.3 方法2：消去除法运算
 
 导致方法1出现数值问题的主要原因是约束式（6．3）中含有除法运算。为了消除该数值问题，提高求解精度，我们尝试消去除法运算的部分，将方程（6．1）完全转换为乘法和加法运算。在方程（6．1）两端同时乘以非 0 因式 $(b+c)(a+c)(a+b)$ 可得：
 $$
@@ -234,7 +237,7 @@ m.addConstr(m6 == b * c) # b * c
 
 # 设置约束
 m.addConstr(lhs == m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c) # 左项式
-m.addConstr(rhs == 4 * (m1 + (b + c) + m2 * (c + a) + m3 * (a + b) + m4 * c)) # 左项式
+m.addConstr(rhs == 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c)) # 左项式
 m.addConstr(lhs == rhs) # 左右项式相等
 
 # 设置目标函数
@@ -263,7 +266,7 @@ $$
 
 如此巨大的整数，求解器确实很难在合理时间内得到正确的解。
 
-6.4 拓展
+## 6.4 拓展
 
 既然求方程（6．1）的正整数解如此困难，那么，如果只要求找到一组整数解呢？本节就来探索这一点，看看若将问题中正整数的要求放宽为整数，求解难度是否会有变化。将模型修改为下面的形式：
 $$
@@ -339,22 +342,22 @@ m = Model("test")
 m.setParam('NonConvex', 2)
 
 # 创建决策变量(变量均为整数)
-a = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="a")
-b = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="b")
-c = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="c")
-m1 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="m1")
-m2 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="m2")
-m3 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="m3")
-m4 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="m4")
-m5 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="m5")
-m6 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="m6")
-m7 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="m7")
-u1 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="u1")
-u2 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="u2")
-u3 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="u3")
-abs_u1 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="abs_u1")
-abs_u2 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="abs_u2")
-abs_u3 = m.addVar(lb=-GRB.INFINITY, ub=-GRB.INFINITY, vtype=GRB.INTEGER, name="abs_u3")
+a = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="a")
+b = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="b")
+c = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="c")
+m1 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="m1")
+m2 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="m2")
+m3 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="m3")
+m4 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="m4")
+m5 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="m5")
+m6 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="m6")
+m7 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="m7")
+u1 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="u1")
+u2 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="u2")
+u3 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="u3")
+abs_u1 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="abs_u1")
+abs_u2 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="abs_u2")
+abs_u3 = m.addVar(lb=-GRB.INFINITY, ub=GRB.INFINITY, vtype=GRB.INTEGER, name="abs_u3")
 lhs = m.addVar(vtype=GRB.INTEGER, name="lhs")
 rhs = m.addVar(vtype=GRB.INTEGER, name="rhs")
 
@@ -380,7 +383,7 @@ m.addConstr(abs_u3 >= 0.00001)
 
 # 设置约束
 m.addConstr(lhs == m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c) # 左项式
-m.addConstr(rhs == 4 * (m1 + (b + c) + m2 * (c + a) + m3 * (a + b) + m4 * c)) # 左项式
+m.addConstr(rhs == 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c)) # 右项式
 m.addConstr(lhs == rhs) # 左右项式相等
 
 
@@ -420,6 +423,7 @@ $$
 
 式中，$k$ 是任意非 0 整数。可以通过变化 $k$ 的值来观察问题的求解难度变化。
 仍考虑 $a 、 b 、 c$ 为正整数。分别将 $k$ 设置为 $1 、 2 、 3$ 进行测试。当 $k=1$ 时，模型无可行解。当 $k=2$ 时， Gurobi可以很快得到一个可行解：$a=1, b=1, c=3$ 。
-6.5 总结
+
+## 6.5 总结
 
 本章以一个数论方程为例讲解了如何将一些看似与优化无关的问题建模为数学规划模型。在模型转换的过程中，需要用到许多有用的模型转化方法，包括将分式约束转换为二次约束、将三次约束转换为二次约束、将 $\neq$ 约束转换为绝对值约束、将 $>(<)$ 约束转换为 $\geqslant(\leqslant)$ 约束以及复杂绝对值约束的转换等。熟练掌握这些方法对建模能力的提高是非常有帮助的。
