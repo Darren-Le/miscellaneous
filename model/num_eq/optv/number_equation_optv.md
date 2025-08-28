@@ -80,14 +80,14 @@ m3 = model.AddVar(lb=0, vtype=OPTV_CONTINUOUS, name="m3")
 model.AddConstr(m1 + m2 + m3 - 4 == 0, name="sum_constraint")
 
 # 添加二次约束
-model.AddQConstr(a - m1 * (b + c), -OPTV_INF, 0.0, name="a_constraint_rhs")
-model.AddQConstr(a - m1 * (b + c), 0.0, OPTV_INF, name="a_constraint_lhs")
+model.AddQConstr(a - m1 * (b + c), -OPTV_INF, 0.0, name="a_rhs")
+model.AddQConstr(a - m1 * (b + c), 0.0, OPTV_INF, name="a_lhs")
 
-model.AddQConstr(b - m2 * (c + a), -OPTV_INF, 0.0, name="b_constraint_rhs")
-model.AddQConstr(b - m2 * (c + a), 0.0, OPTV_INF, name="b_constraint_lhs")
+model.AddQConstr(b - m2 * (c + a), -OPTV_INF, 0.0, name="b_rhs")
+model.AddQConstr(b - m2 * (c + a), 0.0, OPTV_INF, name="b_lhs")
 
-model.AddQConstr(c - m3 * (a + b), -OPTV_INF, 0.0, name="c_constraint_rhs")
-model.AddQConstr(c - m3 * (a + b), 0.0, OPTV_INF, name="c_constraint_lhs")
+model.AddQConstr(c - m3 * (a + b), -OPTV_INF, 0.0, name="c_rhs")
+model.AddQConstr(c - m3 * (a + b), 0.0, OPTV_INF, name="c_lhs")
 
 # 设置目标函数
 model.SetObjective(1, OPTVSense.MINIMIZE)
@@ -156,44 +156,43 @@ a = model.AddVar(lb=1, vtype=OPTV_INTEGER, name="a")
 b = model.AddVar(lb=1, vtype=OPTV_INTEGER, name="b") 
 c = model.AddVar(lb=1, vtype=OPTV_INTEGER, name="c")
 # 辅助变量用于处理二次项和三次项
-a2 = model.AddVar(vtype=OPTV_INTEGER, name="a2")  # a^2
-b2 = model.AddVar(vtype=OPTV_INTEGER, name="b2")  # b^2
-c2 = model.AddVar(vtype=OPTV_INTEGER, name="c2")  # c^2
-ab = model.AddVar(vtype=OPTV_INTEGER, name="ab")  # a*b
-ac = model.AddVar(vtype=OPTV_INTEGER, name="ac")  # a*c
-bc = model.AddVar(vtype=OPTV_INTEGER, name="bc")  # b*c
-abc = model.AddVar(vtype=OPTV_INTEGER, name="abc")  # a*b*c
+m1 = model.AddVar(vtype=OPTV_INTEGER, name="m1") 
+m2 = model.AddVar(vtype=OPTV_INTEGER, name="m2") 
+m3 = model.AddVar(vtype=OPTV_INTEGER, name="m3") 
+m4 = model.AddVar(vtype=OPTV_INTEGER, name="m4") 
+m5 = model.AddVar(vtype=OPTV_INTEGER, name="m5") 
+m6 = model.AddVar(vtype=OPTV_INTEGER, name="m6") 
+m7 = model.AddVar(vtype=OPTV_INTEGER, name="m7")
+lhs = model.AddVar(vtype=OPTV.INTEGER, name="lhs")
+rhs = model.AddVar(vtype=OPTV.INTEGER, name="rhs")
 
 # 辅助变量约束
-model.AddQConstr(a2 - a * a, -OPTV_INF, 0.0, name="a_squared_rhs")
-model.AddQConstr(a2 - a * a, 0.0, OPTV_INF, name="a_squared_lhs")
+model.AddQConstr(m1 - a * a, -OPTV_INF, 0.0, name="a_squared_rhs")
+model.AddQConstr(m1 - a * a, 0.0, OPTV_INF, name="a_squared_lhs")
 
-model.AddQConstr(b2 - b * b, -OPTV_INF, 0.0, name="b_squared_rhs")
-model.AddQConstr(b2 - b * b, 0.0, OPTV_INF, name="b_squared_lhs")
+model.AddQConstr(m2 - b * b, -OPTV_INF, 0.0, name="b_squared_rhs")
+model.AddQConstr(m2 - b * b, 0.0, OPTV_INF, name="b_squared_lhs")
 
-model.AddQConstr(c2 - c * c, -OPTV_INF, 0.0, name="c_squared_rhs")
-model.AddQConstr(c2 - c * c, 0.0, OPTV_INF, name="c_squared_lhs")
+model.AddQConstr(m3 - c * c, -OPTV_INF, 0.0, name="c_squared_rhs")
+model.AddQConstr(m3 - c * c, 0.0, OPTV_INF, name="c_squared_lhs")
 
-model.AddQConstr(ab - a * b, -OPTV_INF, 0.0, name="a_times_b_rhs")
-model.AddQConstr(ab - a * b, 0.0, OPTV_INF, name="a_times_b_lhs")
+model.AddQConstr(m4 - a * b, -OPTV_INF, 0.0, name="ab_rhs")
+model.AddQConstr(m4 - a * b, 0.0, OPTV_INF, name="ab_lhs")
 
-model.AddQConstr(ac - a * c, -OPTV_INF, 0.0, name="a_times_c_rhs")
-model.AddQConstr(ac - a * c, 0.0, OPTV_INF, name="a_times_c_lhs")
+model.AddQConstr(m5 - a * c, -OPTV_INF, 0.0, name="ac_rhs")
+model.AddQConstr(m5 - a * c, 0.0, OPTV_INF, name="ac_lhs")
 
-model.AddQConstr(bc - b * c, -OPTV_INF, 0.0, name="b_times_c_rhs")
-model.AddQConstr(bc - b * c, 0.0, OPTV_INF, name="b_times_c_lhs")
+model.AddQConstr(m6 - b * c, -OPTV_INF, 0.0, name="bc_rhs")
+model.AddQConstr(m6 - b * c, 0.0, OPTV_INF, name="bc_lhs")
 
-model.AddQConstr(abc - ab * c, -OPTV_INF, 0.0, name="abc_constraint_rhs")
-model.AddQConstr(abc - ab * c, 0.0, OPTV_INF, name="abc_constraint_lhs")
+# 左端项
+m.addConstr(lhs - (m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c), -OPTV_INF, 0.0, name="lhs_rhs") 
+m.addConstr(lhs - (m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c), 0.0, OPTV_INF, name="lhs_lhs")
+# 右端项
+m.addConstr(rhs - 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c), -OPTV_INF, 0.0, name="rhs_rhs") 
+m.addConstr(rhs - 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c), 0.0, OPTV_INF, name="rhs_lhs") 
 
-# 构造左边项式
-model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, -OPTV_INF, 0.0, name="lhs_rhs")
-model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, 0.0, OPTV_INF, name="lhs_lhs")
-# 构造右边项式  
-model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), -OPTV_INF, 0.0, name="rhs_rhs")
-model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), 0.0, OPTV_INF, name="rhs_lhs")
-
-# 主要约束：左边等于右边
+# 左边等于右边
 model.AddConstr(lhs - rhs == 0, name="main_constraint")
 
 # 设置目标函数
@@ -285,60 +284,66 @@ a = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="a")
 b = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="b")
 c = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="c")
 # 辅助变量
-a2 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="a2")
-b2 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="b2")
-c2 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="c2")
-ab = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="ab")
-ac = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="ac")
-bc = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="bc")
-abc = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="abc")
+m1 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m1")
+m2 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m2")
+m3 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m3")
+m4 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m4")
+m5 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m5")
+m6 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m6")
+m7 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="m7")
 
 # 用于处理绝对值约束的辅助变量
 u1 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="u1")
 u2 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="u2")
 u3 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="u3")
 
+abs_u1 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="abs_u1")
+abs_u2 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="abs_u2")
+abs_u3 = model.AddVar(lb=-OPTV_INF, ub=OPTV_INF, vtype=OPTV_INTEGER, name="abs_u3")
+lhs = model.AddVar(vtype=OPTV_INTEGER, name="lhs")
+rhs = model.AddVar(vtype=OPTV_INTEGER, name="rhs")
+
 # 辅助变量约束
-model.AddQConstr(a2 - a * a, -OPTV_INF, 0.0, name="a_squared_rhs")
-model.AddQConstr(a2 - a * a, 0.0, OPTV_INF, name="a_squared_lhs")
+model.AddQConstr(m1 - a * a, -OPTV_INF, 0.0, name="a_squared_rhs")
+model.AddQConstr(m1 - a * a, 0.0, OPTV_INF, name="a_squared_lhs")
 
-model.AddQConstr(b2 - b * b, -OPTV_INF, 0.0, name="b_squared_rhs")
-model.AddQConstr(b2 - b * b, 0.0, OPTV_INF, name="b_squared_lhs")
+model.AddQConstr(m2 - b * b, -OPTV_INF, 0.0, name="b_squared_rhs")
+model.AddQConstr(m2 - b * b, 0.0, OPTV_INF, name="b_squared_lhs")
 
-model.AddQConstr(c2 - c * c, -OPTV_INF, 0.0, name="c_squared_rhs")
-model.AddQConstr(c2 - c * c, 0.0, OPTV_INF, name="c_squared_lhs")
+model.AddQConstr(m3 - c * c, -OPTV_INF, 0.0, name="c_squared_rhs")
+model.AddQConstr(m3 - c * c, 0.0, OPTV_INF, name="c_squared_lhs")
 
-model.AddQConstr(ab - a * b, -OPTV_INF, 0.0, name="a_times_b_rhs")
-model.AddQConstr(ab - a * b, 0.0, OPTV_INF, name="a_times_b_lhs")
+model.AddQConstr(m4 - a * b, -OPTV_INF, 0.0, name="ab_rhs")
+model.AddQConstr(m4 - a * b, 0.0, OPTV_INF, name="ab_lhs")
 
-model.AddQConstr(ac - a * c, -OPTV_INF, 0.0, name="a_times_c_rhs")
-model.AddQConstr(ac - a * c, 0.0, OPTV_INF, name="a_times_c_lhs")
+model.AddQConstr(m5 - a * c, -OPTV_INF, 0.0, name="ac_rhs")
+model.AddQConstr(m5 - a * c, 0.0, OPTV_INF, name="ac_lhs")
 
-model.AddQConstr(bc - b * c, -OPTV_INF, 0.0, name="b_times_c_rhs")
-model.AddQConstr(bc - b * c, 0.0, OPTV_INF, name="b_times_c_lhs")
-
-model.AddQConstr(abc - ab * c, -OPTV_INF, 0.0, name="abc_constraint_rhs")
-model.AddQConstr(abc - ab * c, 0.0, OPTV_INF, name="abc_constraint_lhs")
+model.AddQConstr(m6 - b * c, -OPTV_INF, 0.0, name="bc_rhs")
+model.AddQConstr(m6 - b * c, 0.0, OPTV_INF, name="bc_lhs")
 
 # 定义u变量
 model.AddConstr(u1 - a - b == 0, name="u1_def")
 model.AddConstr(u2 - a - c == 0, name="u2_def")
 model.AddConstr(u3 - b - c == 0, name="u3_def")
 
-# 绝对值约束：|ui| >= 1，即ui >= 1 或 ui <= -1
-# 这里简化处理，先尝试ui >= 1的情况
-model.AddConstr(u1 >= 1, name="u1_abs")
-model.AddConstr(u2 >= 1, name="u2_abs")
-model.AddConstr(u3 >= 1, name="u3_abs")
+# 绝对值约束：|ui| >= 1
+model.AddGenConstrAbs(abs_u1, u1)
+model.AddGenConstrAbs(abs_u2, u2)
+model.AddGenConstrAbs(abs_u3, u3)
+model.AddConstr(abs_u1 >= 0.00001)
+model.AddConstr(abs_u2 >= 0.00001)
+model.AddConstr(abs_u3 >= 0.00001)
 
-# 构造左边项式
-model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, -OPTV_INF, 0.0, name="lhs_rhs")
-model.AddQConstr(lhs - a*a2 + a2*b + a2*c + 3*abc + a*b2 + b*b2 + b2*c + b*c2 + a*c2 + c*c2, 0.0, OPTV_INF, name="lhs_lhs")
-# 构造右边项式  
-model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), -OPTV_INF, 0.0, name="rhs_rhs")
-model.AddQConstr(rhs - 4*(a2*b + a2*c + a*b2 + b2*c + b*c2 + a*c2 + 2*abc), 0.0, OPTV_INF, name="rhs_lhs")
-# 主要约束
-model.AddConstr(lhs - rhs == 0, name="main_constraint")
+# 设置约束
+# 左端项
+m.addConstr(lhs - (m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c), -OPTV_INF, 0.0, name="lhs_rhs") 
+m.addConstr(lhs - (m1 * (a + b + c) + m2 * (a + b + c) + m3 * (a + b + c) + 3 * m4 * c), 0.0, OPTV_INF, name="lhs_lhs")
+# 右端项
+m.addConstr(rhs - 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c), -OPTV_INF, 0.0, name="rhs_rhs") 
+m.addConstr(rhs - 4 * (m1 * (b + c) + m2 * (c + a) + m3 * (a + b) + 2 * m4 * c), 0.0, OPTV_INF, name="rhs_lhs") 
+
+m.addConstr(lhs == rhs) # 左右项式相等
 
 # 设置目标函数
 model.SetObjective(1, OPTVSense.MINIMIZE)
