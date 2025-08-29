@@ -255,9 +255,10 @@ class MarketSplit:
             [1] * self.n                      # 变量类型代码，1表示整数变量
         )
         
-        # 设置目标函数系数（所有变量系数为1）
+        # 设置目标函数系数（只有前m个变量系数为1，其余为0）
         for i in range(self.n):
-            h.changeColCost(i, 1)
+            if i < self.m:
+                h.changeColCost(i, 1)  # 前m个变量系数为1
         
         # 添加等式约束 Ax = d
         for i in range(self.m):
@@ -282,26 +283,116 @@ class MarketSplit:
         if save_path is None:
             if instance_id is not None:
                 save_path = f"{instance_id}_original.lp"
-            else:
-                # 使用默认命名
-                from datetime import datetime
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                save_path = f"original_lp_{self.m}x{self.n}_{timestamp}.lp"
         
         # 写入LP文件
         try:
             h.writeModel(save_path)
-            print(f"原始LP问题已保存到: {save_path}")
-            
-            # 打印问题信息
-            print(f"问题规模: {self.m} 个约束, {self.n} 个变量")
-            print(f"目标函数: minimize ∑x_i")
-            print(f"约束条件: Ax = d")
-            print(f"变量边界: 0 ≤ x_i ≤ r_i")
-            print(f"变量类型: 整数")
+            print(f"原始LP问题已保存到: {save_path}")")
             
         except Exception as e:
             print(f"保存LP文件时出错: {e}")
+        
+        return save_path
+
+    def build_reform_lp(self, instance_id=None, save_path=None):
+        """
+        构建并保存重构后的线性规划问题
+        
+        重构后问题形式:
+        min ∑_{i=0}^{m-1} v[i] / c[i]
+        subject to:
+            v = u[0] * b[0] + ... + u[n-m] * b[n-m]
+            -rmax <= v[0], ..., v[n-1] <= rmax
+            v[n] = rmax
+            u,v ∈ Z
+        
+        Args:
+            instance_id: 实例ID，用于生成文件名
+            save_path: LP文件保存路径，如果为None则根据instance_id生成
+        """
+        # 初始化HiGHS模型
+        h = highspy.Highs()
+        
+        # 变量数量：u变量(n_basis个) + v变量(n+1个)
+        total_vars = self.n_basis + (self.n + 1)
+        
+        # 添加u变量：u[0], u[1], ..., u[n_basis-1]
+        # u变量的边界需要根据实际情况设定，这里暂时设为较大范围
+        u_bound = 1000  # 可以根据需要调整
+        for i in range(self.n_basis):
+            h.addVar(-u_bound, u_bound)  # u变量可以为负数
+        
+        # 添加v变量：v[0], v[1], ..., v[n]
+        for i in range(self.n + 1):
+            if i < self.n:
+                # v[0], ..., v[n-1]: 边界为 [-rmax, rmax]
+                h.addVar(-int(self.rmax), int(self.rmax))
+            else:
+                # v[n]: 固定为rmax
+                h.addVar(int(self.rmax), int(self.rmax))
+        
+        # 设置所有变量为整数类型
+        h.changeColsIntegrality(
+            total_vars,                       # 总变量数量
+            list(range(total_vars)),          # 所有变量索引
+            [1] * total_vars                  # 所有变量都是整数
+        )
+        
+        # 设置目标函数系数
+        for i in range(total_vars):
+            if i >= self.n_basis and i < self.n_basis + self.m:
+                # 对应v[0], ..., v[m-1]的系数为 1/c[i-n_basis]
+                v_index = i - self.n_basis
+                coeff = 1.0 / self.c[v_index]
+                h.changeColCost(i, coeff)
+            else:
+                # u变量和其他v变量系数为0
+                h.changeColCost(i, 0)
+        
+        # 添加约束：v = sum(u[i] * basis[i])
+        # 对于每个v[j] (j = 0, ..., n)，添加约束：
+        # v[j] - sum(u[i] * basis[i][j]) = 0
+        for j in range(self.n + 1):
+            nonzero_indices = []
+            nonzero_values = []
+            
+            # v[j]的系数为1
+            v_var_index = self.n_basis + j
+            nonzero_indices.append(v_var_index)
+            nonzero_values.append(1)
+            
+            # u[i] * basis[i][j]的系数为-basis[i][j]
+            for i in range(self.n_basis):
+                if self.basis[i, j] != 0:
+                    nonzero_indices.append(i)  # u[i]的索引
+                    nonzero_values.append(-int(self.basis[i, j]))
+            
+            # 添加等式约束：v[j] - sum(u[i] * basis[i][j]) = 0
+            h.addRow(0, 0, len(nonzero_indices), nonzero_indices, nonzero_values)
+        
+        # 生成保存路径
+        if save_path is None:
+            if instance_id is not None:
+                save_path = f"{instance_id}_reform.lp"
+            else:
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                save_path = f"reform_lp_{self.m}x{self.n}_{timestamp}.lp"
+        
+        # 写入LP文件
+        try:
+            h.writeModel(save_path)
+            print(f"重构后LP问题已保存到: {save_path}")
+            
+            # 打印问题信息
+            print(f"重构问题规模: {self.n_basis} 个u变量, {self.n+1} 个v变量")
+            print(f"约束数量: {self.n+1} 个等式约束（v = ∑u_i*b_i）")
+            print(f"目标函数: minimize ∑_{i=0}^{m-1} v[i]/c[i]")
+            print(f"变量边界: u ∈ [-{u_bound}, {u_bound}], v ∈ [-{self.rmax}, {self.rmax}], v[{self.n}] = {self.rmax}")
+            print(f"变量类型: 整数")
+            
+        except Exception as e:
+            print(f"保存重构LP文件时出错: {e}")
         
         return save_path
 
@@ -436,6 +527,7 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
         ms = MarketSplit(A, d, debug=debug, max_sols=max_sols)
         
         ms.build_original_lp(instance_id)
+        ms.build_reform_lp(instance_id)
         
         init_time = time.time() - init_start
         solutions = ms.enumerate()
