@@ -287,7 +287,7 @@ class MarketSplit:
         # 写入LP文件
         try:
             h.writeModel(save_path)
-            print(f"原始LP问题已保存到: {save_path}")")
+            print(f"原始LP问题已保存到: {save_path}")
             
         except Exception as e:
             print(f"保存LP文件时出错: {e}")
@@ -387,7 +387,7 @@ class MarketSplit:
             # 打印问题信息
             print(f"重构问题规模: {self.n_basis} 个u变量, {self.n+1} 个v变量")
             print(f"约束数量: {self.n+1} 个等式约束（v = ∑u_i*b_i）")
-            print(f"目标函数: minimize ∑_{i=0}^{m-1} v[i]/c[i]")
+            print("目标函数: minimize ∑_{i=0}^{m-1} v[i]/c[i]")
             print(f"变量边界: u ∈ [-{u_bound}, {u_bound}], v ∈ [-{self.rmax}, {self.rmax}], v[{self.n}] = {self.rmax}")
             print(f"变量类型: 整数")
             
