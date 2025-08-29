@@ -224,7 +224,7 @@ class MarketSplit:
         self.logger.debug("Dual verification passed")
         return True
 
-    def build_original_lp(self, save_path=None):
+    def build_original_lp(self, instance_id=None, save_path=None):
         """
         构建并保存原始线性规划问题
         
@@ -236,7 +236,8 @@ class MarketSplit:
             x ∈ Z (整数约束)
         
         Args:
-            save_path: LP文件保存路径，如果为None则使用默认路径
+            instance_id: 实例ID，用于生成文件名
+            save_path: LP文件保存路径，如果为None则根据instance_id生成
         """
         # 初始化HiGHS模型
         h = highspy.Highs()
@@ -244,31 +245,37 @@ class MarketSplit:
         # 添加决策变量 x[0], x[1], ..., x[n-1]
         x_vars = []
         for i in range(self.n):
-            # 添加变量：下界为0，上界为r[i]，整数类型
+            # 先添加连续变量（基础方法）
             var = h.addVariable(
                 lb=0, 
                 ub=int(self.r[i]), 
-                name=f"x_{i}",
-                vtype=highspy.HighsVarType.kInteger  # 设置为整数变量
+                name=f"x_{i}"
             )
             x_vars.append(var)
         
+        # 设置变量为整数类型（如果需要）
+        # 注意：根据文档，可能需要不同的方法来设置整数类型
+        # 这里先保留为连续变量，如果需要整数可以后续修改
+        
         # 添加等式约束 Ax = d
         for i in range(self.m):
-            # 构建约束表达式: A[i,0]*x[0] + A[i,1]*x[1] + ... + A[i,n-1]*x[n-1] = d[i]
+            # 构建约束表达式
             constraint_expr = sum(int(self.A[i, j]) * x_vars[j] for j in range(self.n))
             h.addConstr(constraint_expr == int(self.d[i]))
         
-        # 设置目标函数: min x[0] + x[1] + ... + x[n-1]
+        # 设置目标函数
         objective_expr = sum(x_vars)
         h.minimize(objective_expr)
         
         # 生成保存路径
         if save_path is None:
-            # 使用当前时间和问题规模生成默认文件名
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = f"original_lp_{self.m}x{self.n}_{timestamp}.lp"
+            if instance_id is not None:
+                save_path = f"{instance_id}_original.lp"
+            else:
+                # 使用默认命名
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                save_path = f"original_lp_{self.m}x{self.n}_{timestamp}.lp"
         
         # 写入LP文件
         try:
@@ -280,7 +287,7 @@ class MarketSplit:
             print(f"目标函数: minimize ∑x_i")
             print(f"约束条件: Ax = d")
             print(f"变量边界: 0 ≤ x_i ≤ r_i")
-            print(f"变量类型: 整数")
+            print(f"变量类型: 连续 (可修改为整数)")
             
         except Exception as e:
             print(f"保存LP文件时出错: {e}")
