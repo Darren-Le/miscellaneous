@@ -56,7 +56,7 @@ class MarketSplit:
         self._get_gso()
         self._compute_dual_norms()
         self._get_coordinates()
-        
+
         # Make arrays read-only
         self._basis.flags.writeable = False
         self._b_hat.flags.writeable = False
@@ -67,6 +67,8 @@ class MarketSplit:
         
         self.verify_gso()
         self.verify_dual()
+        
+        self.original_lp_file = self.build_original_lp()
 
     @property
     def basis(self):
@@ -228,6 +230,66 @@ class MarketSplit:
         
         self.logger.debug("Dual verification passed")
         return True
+
+    def build_original_lp(self):
+        """构建原始LP问题并保存为lp文件
+        
+        原始问题:
+        minimize sum(x[i] for i in range(n))
+        subject to:
+            A @ x = d
+            0 <= x[i] <= r[i] for i in range(n)
+            x ∈ Z (整数约束)
+        """
+        try:
+            import highspy
+        except ImportError:
+            self.logger.warning("highspy未安装，无法构建LP文件")
+            return None
+        
+        # 创建Highs模型
+        model = highspy.Highs()
+        model.silent()  # 设置静默模式
+        
+        # 添加变量 x[0], x[1], ..., x[n-1]
+        var_names = [f"x{i}" for i in range(self.n)]
+        
+        # 目标函数系数：所有变量系数都是1 (minimize sum(x_i))
+        obj_coeffs = [1.0] * self.n
+        
+        # 变量下界：都是0
+        var_lower = [0.0] * self.n
+        
+        # 变量上界：使用r向量
+        var_upper = self.r.astype(float).tolist()
+        
+        # 添加变量到模型
+        var_indices = []
+        for i in range(self.n):
+            idx = model.addVar(var_lower[i], var_upper[i], obj_coeffs[i])
+            var_indices.append(idx)
+        
+        # 添加等式约束 A @ x = d
+        for i in range(self.m):
+            # 获取第i行约束的系数
+            row_coeffs = self.A[i, :].astype(float).tolist()
+            # 约束右端值
+            rhs = float(self.d[i])
+            # 添加等式约束 (lower_bound = upper_bound = rhs)
+            model.addConstr(var_indices, row_coeffs, rhs, rhs)
+        
+        # 设置变量为整数类型
+        for i in range(self.n):
+            model.changeColIntegrality(i, highspy.HighsVarType.kInteger)
+        
+        # 生成文件名
+        filename = f"original_lp_{self.m}x{self.n}.lp"
+        
+        # 写入LP文件
+        model.writeModel(filename)
+        self.logger.debug(f"原始LP问题已保存到: {filename}")
+        
+        return filename
 
     def enumerate(self):
         start_time = time.time()  # Track start time
