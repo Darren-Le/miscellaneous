@@ -69,7 +69,6 @@ class MarketSplit:
         self.verify_gso()
         self.verify_dual()
         
-        # 构建并保存原始LP问题
         self.build_original_lp()
 
     @property
