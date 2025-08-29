@@ -26,7 +26,12 @@ class MarketSplit:
         self.d = d
         self.m, self.n = A.shape
         self.n_basis = self.n - self.m + 1
-        self.r = r if r else np.ones(self.n, dtype=int)
+        # self.r = r if r else np.ones(self.n, dtype=int)
+        if r is None:
+            self.r = np.ones(self.n, dtype=int)
+            self.r[:self.m] = self.d
+        else:
+            self.r = r
 
         self.backtrack_loops = 0
         self.first_sol_bt_loops = 0
@@ -382,10 +387,6 @@ class MarketSplit:
         if save_path is None:
             if instance_id is not None:
                 save_path = f"{instance_id}_reform.lp"
-            else:
-                from datetime import datetime
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                save_path = f"reform_lp_{self.m}x{self.n}_{timestamp}.lp"
         
         # 写入LP文件
         try:
