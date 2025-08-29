@@ -69,8 +69,6 @@ class MarketSplit:
         self.verify_gso()
         self.verify_dual()
         
-        self.build_original_lp()
-
     @property
     def basis(self):
         return self._basis
@@ -240,10 +238,6 @@ class MarketSplit:
         Args:
             save_path: LP文件保存路径，如果为None则使用默认路径
         """
-        if not HIGHSPY_AVAILABLE:
-            print("highspy不可用，跳过LP文件生成")
-            return None
-            
         # 初始化HiGHS模型
         h = highspy.Highs()
         
@@ -422,6 +416,9 @@ def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
         start_time = time.time()
         init_start = time.time()
         ms = MarketSplit(A, d, debug=debug, max_sols=max_sols)
+        
+        ms.build_original_lp(instance_id)
+        
         init_time = time.time() - init_start
         solutions = ms.enumerate()
         solve_time = time.time() - start_time
