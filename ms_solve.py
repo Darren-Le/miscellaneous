@@ -299,7 +299,7 @@ class MarketSplit:
         构建并保存重构后的线性规划问题
         
         重构后问题形式:
-        min ∑_{i=0}^{m-1} v[i] / c[i]
+        min ∑_{i=0}^{n-1} v[i] / c[i]
         subject to:
             v = u[0] * b[0] + ... + u[n-m] * b[n-m]
             -rmax <= v[0], ..., v[n-1] <= rmax
@@ -317,8 +317,9 @@ class MarketSplit:
         total_vars = self.n_basis + (self.n + 1)
         
         # 添加u变量：u[0], u[1], ..., u[n_basis-1]
-        # u变量的边界需要根据实际情况设定，这里暂时设为较大范围
-        u_bound = 1000  # 可以根据需要调整
+        # u变量的边界需要根据实际情况设定
+        max_basis_val = np.max(np.abs(self.basis))
+        u_bound = max(1000, int(2 * self.rmax / max_basis_val)) if max_basis_val > 0 else 1000
         for i in range(self.n_basis):
             h.addVar(-u_bound, u_bound)  # u变量可以为负数
         
@@ -338,15 +339,15 @@ class MarketSplit:
             [1] * total_vars                  # 所有变量都是整数
         )
         
-        # 设置目标函数系数
+        # 设置目标函数系数：min ∑_{i=0}^{n-1} v[i] / c[i]
         for i in range(total_vars):
-            if i >= self.n_basis and i < self.n_basis + self.m:
-                # 对应v[0], ..., v[m-1]的系数为 1/c[i-n_basis]
+            if i >= self.n_basis and i < self.n_basis + self.n:
+                # 对应v[0], ..., v[n-1]的系数为 1/c[i-n_basis]
                 v_index = i - self.n_basis
                 coeff = 1.0 / self.c[v_index]
                 h.changeColCost(i, coeff)
             else:
-                # u变量和其他v变量系数为0
+                # u变量和v[n]变量系数为0
                 h.changeColCost(i, 0)
         
         # 添加约束：v = sum(u[i] * basis[i])
@@ -387,7 +388,7 @@ class MarketSplit:
             # 打印问题信息
             print(f"重构问题规模: {self.n_basis} 个u变量, {self.n+1} 个v变量")
             print(f"约束数量: {self.n+1} 个等式约束（v = ∑u_i*b_i）")
-            print("目标函数: minimize ∑_{i=0}^{m-1} v[i]/c[i]")
+            print("目标函数: minimize ∑_{i=0}^{n-1} v[i]/c[i]")
             print(f"变量边界: u ∈ [-{u_bound}, {u_bound}], v ∈ [-{self.rmax}, {self.rmax}], v[{self.n}] = {self.rmax}")
             print(f"变量类型: 整数")
             
