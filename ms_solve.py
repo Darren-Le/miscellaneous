@@ -10,7 +10,8 @@ import highspy
 from ms_data import MSData
 
 class MarketSplit:
-    def __init__(self, A, d, r=None, max_sols=-1, debug=False):
+    def __init__(self, A, d, r=None, r_front=None, max_sols=-1, debug=False):
+
         # Set up logger
         self.logger = logging.getLogger(__name__)
         if debug:
@@ -29,7 +30,10 @@ class MarketSplit:
         # self.r = r if r else np.ones(self.n, dtype=int)
         if r is None:
             self.r = np.ones(self.n, dtype=int)
-            self.r[:self.m] = self.d
+            if r_front == -1:
+                self.r[:self.m] = self.d
+            elif r_front is not None:
+                self.r[:self.m] = r_front
         else:
             self.r = r
 
@@ -229,7 +233,7 @@ class MarketSplit:
         self.logger.debug("Dual verification passed")
         return True
 
-    def build_original_lp(self, instance_id=None, save_path=None):
+    def build_original_lp(self, instance_id=None, r_front=None, save_path=None):
         """
         构建并保存原始线性规划问题
         
@@ -287,7 +291,11 @@ class MarketSplit:
         # 生成保存路径
         if save_path is None:
             if instance_id is not None:
-                save_path = f"{instance_id}_original.lp"
+                if r_front is not None:
+                    save_path = f"{instance_id}_original_{r_front}.lp"
+                else:
+                    save_path = f"{instance_id}_original.lp"
+                    
         
         # 写入LP文件
         try:
@@ -299,7 +307,7 @@ class MarketSplit:
         
         return save_path
 
-    def build_reform_lp(self, instance_id=None, save_path=None):
+    def build_reform_lp(self, instance_id=None, r_front=None, save_path=None):
         """
         构建并保存重构后的线性规划问题
         
@@ -386,7 +394,10 @@ class MarketSplit:
         # 生成保存路径
         if save_path is None:
             if instance_id is not None:
-                save_path = f"{instance_id}_reform.lp"
+                if r_front is not None:
+                    save_path = f"{instance_id}_reform_{r_front}.lp"
+                else:
+                    save_path = f"{instance_id}_reform.lp"
         
         # 写入LP文件
         try:
@@ -533,14 +544,14 @@ class MarketSplit:
         
         return sols
 
-def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, debug=False):
+def ms_run(A, d, instance_id, opt_sol=None, max_sols=-1, r_front=None, debug=False):
     try:
         start_time = time.time()
         init_start = time.time()
-        ms = MarketSplit(A, d, debug=debug, max_sols=max_sols)
+        ms = MarketSplit(A, d, r_front=r_front, debug=debug, max_sols=max_sols)
         
-        ms.build_original_lp(instance_id)
-        ms.build_reform_lp(instance_id)
+        ms.build_original_lp(instance_id, r_front)
+        ms.build_reform_lp(instance_id, r_front)
         
         init_time = time.time() - init_start
         solutions = ms.enumerate()
@@ -592,9 +603,10 @@ def print_and_log(text, file_handle):
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Market Split Solver')
-    parser.add_argument('--data_path', type=str, default="../ms_instance/01-marketsplit/instances", help='Path to instance data')
-    parser.add_argument('--sol_path', type=str, default="../ms_instance/01-marketsplit/solutions", help='Path to solution data')
+    parser.add_argument('--data_path', type=str, default="/home/szg/lattice/ms_instance/01-marketsplit/instances", help='Path to instance data')
+    parser.add_argument('--sol_path', type=str, default="/home/szg/lattice/ms_instance/01-marketsplit/solutions", help='Path to solution data')
     parser.add_argument('--max_sols', type=int, default=-1, help='Maximum number of solutions to find (-1 for all)')
+    parser.add_argument('--r', type=int, default=-1, help='Value for first m variables r (1,2,5,10,20,50,100), -1 uses d values')
     parser.add_argument('--debug', action='store_true', help='Enable debug print')
     args = parser.parse_args()
 
@@ -614,7 +626,7 @@ if __name__ == "__main__":
         for inst in instances:
             A, d = inst['A'], inst['d']
             opt_sol = ms_data.get_solution(inst['id'])
-            result = ms_run(A, d, inst['id'], opt_sol, max_sols, debug=debug_mode)
+            result = ms_run(A, d, inst['id'], opt_sol, max_sols, args.r, debug=debug_mode)
             all_results.append(result)
             
             status = "✓" if result['success'] else "✗"
