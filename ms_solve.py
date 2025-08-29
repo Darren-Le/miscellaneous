@@ -243,29 +243,40 @@ class MarketSplit:
         h = highspy.Highs()
         
         # 添加决策变量 x[0], x[1], ..., x[n-1]
-        x_vars = []
+        # 先添加为连续变量
         for i in range(self.n):
-            # 先添加连续变量（基础方法）
-            var = h.addVariable(
-                lb=0, 
-                ub=int(self.r[i]), 
-                name=f"x_{i}"
-            )
-            x_vars.append(var)
+            h.addVar(0, int(self.r[i]))  # 下界0，上界r[i]
         
-        # 设置变量为整数类型（如果需要）
-        # 注意：根据文档，可能需要不同的方法来设置整数类型
-        # 这里先保留为连续变量，如果需要整数可以后续修改
+        # 设置变量为整数类型
+        # 参数：变量数量，变量索引列表，变量类型代码列表（1表示整数）
+        h.changeColsIntegrality(
+            self.n,                           # 变量数量
+            list(range(self.n)),              # 变量索引 [0, 1, 2, ..., n-1]
+            [1] * self.n                      # 变量类型代码，1表示整数变量
+        )
+        
+        # 设置目标函数系数（所有变量系数为1）
+        for i in range(self.n):
+            h.changeColCost(i, 1)
         
         # 添加等式约束 Ax = d
         for i in range(self.m):
-            # 构建约束表达式
-            constraint_expr = sum(int(self.A[i, j]) * x_vars[j] for j in range(self.n))
-            h.addConstr(constraint_expr == int(self.d[i]))
-        
-        # 设置目标函数
-        objective_expr = sum(x_vars)
-        h.minimize(objective_expr)
+            # 找出该约束中非零系数的变量
+            nonzero_indices = []
+            nonzero_values = []
+            for j in range(self.n):
+                if self.A[i, j] != 0:
+                    nonzero_indices.append(j)
+                    nonzero_values.append(int(self.A[i, j]))
+            
+            # 添加约束：等式约束的上界和下界都是d[i]
+            h.addRow(
+                int(self.d[i]),           # 下界
+                int(self.d[i]),           # 上界（等式约束上下界相等）
+                len(nonzero_indices),     # 非零元素个数
+                nonzero_indices,          # 变量索引
+                nonzero_values            # 系数值
+            )
         
         # 生成保存路径
         if save_path is None:
@@ -287,7 +298,7 @@ class MarketSplit:
             print(f"目标函数: minimize ∑x_i")
             print(f"约束条件: Ax = d")
             print(f"变量边界: 0 ≤ x_i ≤ r_i")
-            print(f"变量类型: 连续 (可修改为整数)")
+            print(f"变量类型: 整数")
             
         except Exception as e:
             print(f"保存LP文件时出错: {e}")
