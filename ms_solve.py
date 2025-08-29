@@ -299,12 +299,13 @@ class MarketSplit:
         构建并保存重构后的线性规划问题
         
         重构后问题形式:
-        min ∑_{i=0}^{n-1} v[i] / c[i]
+        min (1/c[0], ..., 1/c[n-1]) @ (Bu)
         subject to:
-            v = u[0] * b[0] + ... + u[n-m] * b[n-m]
-            -rmax <= v[0], ..., v[n-1] <= rmax
-            v[n] = rmax
-            u,v ∈ Z
+            -rmax <= (Bu)_i <= rmax, for i = 0, ..., n-1
+            (Bu)_n = rmax
+            u ∈ Z
+        
+        其中B是基向量矩阵，维数(n+1)×(n-m+1)
         
         Args:
             instance_id: 实例ID，用于生成文件名
@@ -313,63 +314,62 @@ class MarketSplit:
         # 初始化HiGHS模型
         h = highspy.Highs()
         
-        # 变量数量：u变量(n_basis个) + v变量(n+1个)
-        total_vars = self.n_basis + (self.n + 1)
+        # 获取无穷大值
+        inf = highspy.kHighsInf
         
-        # 添加u变量：u[0], u[1], ..., u[n_basis-1]
-        # u变量的边界需要根据实际情况设定
-        max_basis_val = np.max(np.abs(self.basis))
-        u_bound = max(1000, int(2 * self.rmax / max_basis_val)) if max_basis_val > 0 else 1000
+        # 只有u变量：u[0], u[1], ..., u[n_basis-1]，共n_basis = n-m+1个变量
         for i in range(self.n_basis):
-            h.addVar(-u_bound, u_bound)  # u变量可以为负数
-        
-        # 添加v变量：v[0], v[1], ..., v[n]
-        for i in range(self.n + 1):
-            if i < self.n:
-                # v[0], ..., v[n-1]: 边界为 [-rmax, rmax]
-                h.addVar(-int(self.rmax), int(self.rmax))
-            else:
-                # v[n]: 固定为rmax
-                h.addVar(int(self.rmax), int(self.rmax))
+            h.addVar(-inf, inf)  # u变量边界为正负无穷
         
         # 设置所有变量为整数类型
         h.changeColsIntegrality(
-            total_vars,                       # 总变量数量
-            list(range(total_vars)),          # 所有变量索引
-            [1] * total_vars                  # 所有变量都是整数
+            self.n_basis,                     # 变量数量
+            list(range(self.n_basis)),        # 变量索引
+            [1] * self.n_basis                # 所有变量都是整数
         )
         
-        # 设置目标函数系数：min ∑_{i=0}^{n-1} v[i] / c[i]
-        for i in range(total_vars):
-            if i >= self.n_basis and i < self.n_basis + self.n:
-                # 对应v[0], ..., v[n-1]的系数为 1/c[i-n_basis]
-                v_index = i - self.n_basis
-                coeff = 1.0 / self.c[v_index]
-                h.changeColCost(i, coeff)
-            else:
-                # u变量和v[n]变量系数为0
-                h.changeColCost(i, 0)
+        # 设置目标函数系数：min (1/c[0], ..., 1/c[n-1]) @ (Bu)
+        # u[j]的系数 = ∑_{i=0}^{n-1} (1/c[i]) * B[i,j]
+        for j in range(self.n_basis):
+            coeff = 0.0
+            for i in range(self.n):  # 只对前n行计算
+                coeff += (1.0 / self.c[i]) * self.basis[j, i]  # basis是按行存储的
+            h.changeColCost(j, coeff)
         
-        # 添加约束：v = sum(u[i] * basis[i])
-        # 对于每个v[j] (j = 0, ..., n)，添加约束：
-        # v[j] - sum(u[i] * basis[i][j]) = 0
-        for j in range(self.n + 1):
+        # 添加约束：-rmax <= (Bu)_i <= rmax, for i = 0, ..., n-1
+        for i in range(self.n):
+            # 找出第i个约束中的非零系数
             nonzero_indices = []
             nonzero_values = []
+            for j in range(self.n_basis):
+                if self.basis[j, i] != 0:  # basis[j,i]是B[i,j]
+                    nonzero_indices.append(j)
+                    nonzero_values.append(int(self.basis[j, i]))
             
-            # v[j]的系数为1
-            v_var_index = self.n_basis + j
-            nonzero_indices.append(v_var_index)
-            nonzero_values.append(1)
-            
-            # u[i] * basis[i][j]的系数为-basis[i][j]
-            for i in range(self.n_basis):
-                if self.basis[i, j] != 0:
-                    nonzero_indices.append(i)  # u[i]的索引
-                    nonzero_values.append(-int(self.basis[i, j]))
-            
-            # 添加等式约束：v[j] - sum(u[i] * basis[i][j]) = 0
-            h.addRow(0, 0, len(nonzero_indices), nonzero_indices, nonzero_values)
+            # 添加不等式约束：-rmax <= ∑_j B[i,j] * u[j] <= rmax
+            h.addRow(
+                -int(self.rmax),              # 下界
+                int(self.rmax),               # 上界
+                len(nonzero_indices),         # 非零元素个数
+                nonzero_indices,              # 变量索引
+                nonzero_values                # 系数值
+            )
+        
+        # 添加等式约束：(Bu)_n = rmax
+        nonzero_indices = []
+        nonzero_values = []
+        for j in range(self.n_basis):
+            if self.basis[j, self.n] != 0:  # basis[j,n]是B[n,j]
+                nonzero_indices.append(j)
+                nonzero_values.append(int(self.basis[j, self.n]))
+        
+        h.addRow(
+            int(self.rmax),               # 下界 = rmax
+            int(self.rmax),               # 上界 = rmax（等式约束）
+            len(nonzero_indices),         # 非零元素个数
+            nonzero_indices,              # 变量索引
+            nonzero_values                # 系数值
+        )
         
         # 生成保存路径
         if save_path is None:
@@ -386,11 +386,12 @@ class MarketSplit:
             print(f"重构后LP问题已保存到: {save_path}")
             
             # 打印问题信息
-            print(f"重构问题规模: {self.n_basis} 个u变量, {self.n+1} 个v变量")
-            print(f"约束数量: {self.n+1} 个等式约束（v = ∑u_i*b_i）")
-            print("目标函数: minimize ∑_{i=0}^{n-1} v[i]/c[i]")
-            print(f"变量边界: u ∈ [-{u_bound}, {u_bound}], v ∈ [-{self.rmax}, {self.rmax}], v[{self.n}] = {self.rmax}")
-            print(f"变量类型: 整数")
+            print(f"重构问题规模: {self.n_basis} 个u变量")
+            print(f"约束数量: {self.n} 个不等式约束 + 1 个等式约束")
+            print("目标函数: minimize (1/c[0], ..., 1/c[n-1]) @ (Bu)")
+            print(f"约束条件: -rmax <= (Bu)_i <= rmax (i=0..n-1), (Bu)_n = rmax")
+            print("变量边界: u ∈ (-∞, +∞)")
+            print("变量类型: 整数")
             
         except Exception as e:
             print(f"保存重构LP文件时出错: {e}")
