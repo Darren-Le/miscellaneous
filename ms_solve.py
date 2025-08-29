@@ -6,6 +6,7 @@ import logging
 import time
 from datetime import datetime
 import argparse
+import highspy
 from ms_data import MSData
 
 class MarketSplit:
@@ -68,7 +69,8 @@ class MarketSplit:
         self.verify_gso()
         self.verify_dual()
         
-        self.original_lp_file = self.build_original_lp()
+        # 构建并保存原始LP问题
+        self.build_original_lp()
 
     @property
     def basis(self):
@@ -225,65 +227,72 @@ class MarketSplit:
         self.logger.debug("Dual verification passed")
         return True
 
-    def build_original_lp(self):
-        """构建原始LP问题并保存为lp文件
-        
-        原始问题:
-        minimize sum(x[i] for i in range(n))
-        subject to:
-            A @ x = d
-            0 <= x[i] <= r[i] for i in range(n)
-            x ∈ Z (整数约束)
+    def build_original_lp(self, save_path=None):
         """
-        try:
-            import highspy
-        except ImportError:
-            self.logger.warning("highspy未安装，无法构建LP文件")
+        构建并保存原始线性规划问题
+        
+        原始问题形式:
+        min x[0] + x[1] + ... + x[n-1]
+        subject to:
+            Ax = d
+            0 <= x[i] <= r[i] for i = 0, ..., n-1
+            x ∈ Z (整数约束)
+        
+        Args:
+            save_path: LP文件保存路径，如果为None则使用默认路径
+        """
+        if not HIGHSPY_AVAILABLE:
+            print("highspy不可用，跳过LP文件生成")
             return None
+            
+        # 初始化HiGHS模型
+        h = highspy.Highs()
         
-        # 创建Highs模型
-        model = highspy.Highs()
-        model.silent()  # 设置静默模式
-        
-        # 添加变量 x[0], x[1], ..., x[n-1]
-        var_names = [f"x{i}" for i in range(self.n)]
-        
-        # 目标函数系数：所有变量系数都是1 (minimize sum(x_i))
-        obj_coeffs = [1.0] * self.n
-        
-        # 变量下界：都是0
-        var_lower = [0.0] * self.n
-        
-        # 变量上界：使用r向量
-        var_upper = self.r.astype(float).tolist()
-        
-        # 添加变量到模型
-        var_indices = []
+        # 添加决策变量 x[0], x[1], ..., x[n-1]
+        x_vars = []
         for i in range(self.n):
-            idx = model.addVar(var_lower[i], var_upper[i], obj_coeffs[i])
-            var_indices.append(idx)
+            # 添加变量：下界为0，上界为r[i]，整数类型
+            var = h.addVariable(
+                lb=0, 
+                ub=int(self.r[i]), 
+                name=f"x_{i}",
+                vtype=highspy.HighsVarType.kInteger  # 设置为整数变量
+            )
+            x_vars.append(var)
         
-        # 添加等式约束 A @ x = d
+        # 添加等式约束 Ax = d
         for i in range(self.m):
-            # 获取第i行约束的系数
-            row_coeffs = self.A[i, :].astype(float).tolist()
-            # 约束右端值
-            rhs = float(self.d[i])
-            # 添加等式约束 (lower_bound = upper_bound = rhs)
-            model.addConstr(var_indices, row_coeffs, rhs, rhs)
+            # 构建约束表达式: A[i,0]*x[0] + A[i,1]*x[1] + ... + A[i,n-1]*x[n-1] = d[i]
+            constraint_expr = sum(int(self.A[i, j]) * x_vars[j] for j in range(self.n))
+            h.addConstr(constraint_expr == int(self.d[i]))
         
-        # 设置变量为整数类型
-        for i in range(self.n):
-            model.changeColIntegrality(i, highspy.HighsVarType.kInteger)
+        # 设置目标函数: min x[0] + x[1] + ... + x[n-1]
+        objective_expr = sum(x_vars)
+        h.minimize(objective_expr)
         
-        # 生成文件名
-        filename = f"original_lp_{self.m}x{self.n}.lp"
+        # 生成保存路径
+        if save_path is None:
+            # 使用当前时间和问题规模生成默认文件名
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path = f"original_lp_{self.m}x{self.n}_{timestamp}.lp"
         
         # 写入LP文件
-        model.writeModel(filename)
-        self.logger.debug(f"原始LP问题已保存到: {filename}")
+        try:
+            h.writeModel(save_path)
+            print(f"原始LP问题已保存到: {save_path}")
+            
+            # 打印问题信息
+            print(f"问题规模: {self.m} 个约束, {self.n} 个变量")
+            print(f"目标函数: minimize ∑x_i")
+            print(f"约束条件: Ax = d")
+            print(f"变量边界: 0 ≤ x_i ≤ r_i")
+            print(f"变量类型: 整数")
+            
+        except Exception as e:
+            print(f"保存LP文件时出错: {e}")
         
-        return filename
+        return save_path
 
     def enumerate(self):
         start_time = time.time()  # Track start time
