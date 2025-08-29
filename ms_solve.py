@@ -124,12 +124,6 @@ class MarketSplit:
         for i in range(self.n):
             self.L[self.m + i, 1 + i] = 2 * self.c[i]
         
-        print(f"L.shape: {ms.L.shape}")
-        print(f"m: {ms.m}, n: {ms.n}")  
-        print(f"rmax: {ms.rmax}")
-        print(f"L matrix (first 10 rows, first 10 cols):")
-        print(ms.L[:10, :10])
-
     def _get_reduced_basis(self):
         ext_m, ext_n = self.L.shape
         L_lll = IntegerMatrix.from_matrix(self.L.T.tolist())
@@ -470,8 +464,8 @@ def print_and_log(text, file_handle):
 # 主函数部分 - 使用数据文件
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Market Split Solver')
-    parser.add_argument('--data_path', type=str, default="ms_instance/01-marketsplit/instances", help='Path to instance data')
-    parser.add_argument('--sol_path', type=str, default="ms_instance/01-marketsplit/solutions", help='Path to solution data')
+    parser.add_argument('--data_path', type=str, default="../ms_instance/01-marketsplit/instances", help='Path to instance data')
+    parser.add_argument('--sol_path', type=str, default="../ms_instance/01-marketsplit/solutions", help='Path to solution data')
     parser.add_argument('--max_sols', type=int, default=-1, help='Maximum number of solutions to find (-1 for all)')
     parser.add_argument('--debug', action='store_true', help='Enable debug print')
     args = parser.parse_args()
