@@ -8,6 +8,9 @@
 #include <chrono>
 #include <fplll/fplll.h>
 
+#define MAX_N_BASIS 128
+#define MAX_N_PLUS_1 128
+
 using namespace Eigen;
 using namespace std;
 using namespace fplll;
@@ -67,7 +70,6 @@ private:
     void get_gso();
     void compute_dual_norms();
     void get_coordinates();
-    bool backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds);
 
 public:
     MarketSplit(const MatrixXi& A, const VectorXi& d, const VectorXi& r = VectorXi(), int max_sols = -1, bool debug = false);
@@ -75,6 +77,9 @@ public:
     
     bool verify_gso(double tol = 1e-10) const;
     bool verify_dual(double tol = 1e-10) const;
+
+    inline bool backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds);
+
     // Getters for statistics
     long long get_backtrack_loops() const { return backtrack_loops; }
     long long get_dive_loops() const { return dive_loops; }

@@ -324,6 +324,45 @@ void MarketSplit::get_coordinates() {
     }
 }
 
+bool MarketSplit::verify_gso(double tol) const {
+    // Check orthogonality
+    for (int i = 0; i < n_basis; i++) {
+        for (int j = i + 1; j < n_basis; j++) {
+            double dot_product = b_hat.row(i).dot(b_hat.row(j));
+            if (abs(dot_product) > tol) {
+                if (debug) cout << "Orthogonality failed: b_hat[" << i << "] Â· b_hat[" << j << "] = " << dot_product << endl;
+                return false;
+            }
+        }
+    }
+    for (int i = 0; i < n_basis; i++) {
+        RowVectorXd reconstructed = b_hat.row(i);
+        for (int j = 0; j < i; j++) {
+            reconstructed += mu(i, j) * b_hat.row(j);
+        }
+        
+        if (!basis.row(i).cast<double>().isApprox(reconstructed, tol)) {
+            if (debug) cout << "GSO formula failed for basis[" << i << "]" << endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool MarketSplit::verify_dual(double tol) const {
+    for (int i = 0; i < n_basis; i++) {
+        for (int j = 0; j < n_basis; j++) {
+            double dot_product = b_bar.row(i).dot(basis.row(j).cast<double>());
+            double expected = (i == j) ? 1.0 : 0.0;
+            if (abs(dot_product - expected) > tol) {
+                if (debug) cout << "Dual property failed" << endl;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, 
                            vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds) {
     backtrack_loops++;
@@ -428,61 +467,51 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
     return false;
 }
 
-bool MarketSplit::verify_gso(double tol) const {
-    // Check orthogonality
-    for (int i = 0; i < n_basis; i++) {
-        for (int j = i + 1; j < n_basis; j++) {
-            double dot_product = b_hat.row(i).dot(b_hat.row(j));
-            if (abs(dot_product) > tol) {
-                if (debug) cout << "Orthogonality failed: b_hat[" << i << "] Â· b_hat[" << j << "] = " << dot_product << endl;
-                return false;
-            }
-        }
-    }
-    for (int i = 0; i < n_basis; i++) {
-        RowVectorXd reconstructed = b_hat.row(i);
-        for (int j = 0; j < i; j++) {
-            reconstructed += mu(i, j) * b_hat.row(j);
-        }
-        
-        if (!basis.row(i).cast<double>().isApprox(reconstructed, tol)) {
-            if (debug) cout << "GSO formula failed for basis[" << i << "]" << endl;
-            return false;
-        }
-    }
-    return true;
-}
-
-bool MarketSplit::verify_dual(double tol) const {
-    for (int i = 0; i < n_basis; i++) {
-        for (int j = 0; j < n_basis; j++) {
-            double dot_product = b_bar.row(i).dot(basis.row(j).cast<double>());
-            double expected = (i == j) ? 1.0 : 0.0;
-            if (abs(dot_product - expected) > tol) {
-                if (debug) cout << "Dual property failed" << endl;
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
+// vector<VectorXi> MarketSplit::enumerate() {
+//     vector<VectorXi> solutions;
+//     double c = (n + 1) * rmax * rmax;
+    
+//     // Global bounds
+//     double sqrt_c = sqrt(c);
+//     VectorXd u_global_bounds(n_basis);
+//     for (int i = 0; i < n_basis; i++) {
+//         u_global_bounds(i) = min(b_bar_norms_l2(i) * sqrt_c, b_bar_norms_l1(i) * rmax);
+//     }
+    
+//     vector<int> u_values(n_basis, 0);
+//     VectorXd initial_w = VectorXd::Zero(n + 1);
+    
+//     backtrack(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
+    
+//     return solutions;
+// }
 
 vector<VectorXi> MarketSplit::enumerate() {
     vector<VectorXi> solutions;
     double c = (n + 1) * rmax * rmax;
     
-    // Global bounds
-    double sqrt_c = sqrt(c);
-    VectorXd u_global_bounds(n_basis);
-    for (int i = 0; i < n_basis; i++) {
-        u_global_bounds(i) = min(b_bar_norms_l2(i) * sqrt_c, b_bar_norms_l1(i) * rmax);
+    // Pre-allocate arrays on stack instead of dynamic allocation
+    double u_global_bounds[MAX_N_BASIS];
+    int u_values[MAX_N_BASIS];
+    double initial_w[MAX_N_PLUS_1];
+    
+    // Check bounds
+    if (n_basis > MAX_N_BASIS || n + 1 > MAX_N_PLUS_1) {
+        throw runtime_error("Problem size exceeds optimization limits");
     }
     
-    vector<int> u_values(n_basis, 0);
-    VectorXd initial_w = VectorXd::Zero(n + 1);
+    // Initialize stack arrays
+    double sqrt_c = sqrt(c);
+    for (int i = 0; i < n_basis; i++) {
+        u_global_bounds[i] = min(b_bar_norms_l2(i) * sqrt_c, b_bar_norms_l1(i) * rmax);
+        u_values[i] = 0;
+    }
     
-    backtrack(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
+    for (int i = 0; i < n + 1; i++) {
+        initial_w[i] = 0.0;
+    }
+    
+    backtrack_inline(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
     
     return solutions;
 }

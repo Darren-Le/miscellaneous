@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -O3
+CXXFLAGS = -std=c++17 -O3 -march=mative -flto -funroll-loops -ffast-math -DNDEBUG
 INCLUDES = -I/home/szg/local/include/eigen3 -I/home/szg/local/include
 LIBS = -L/home/szg/local/lib -lfplll -lgmp -lmpfr -lstdc++fs
 
