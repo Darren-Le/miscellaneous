@@ -197,18 +197,18 @@ void MarketSplit::get_extended_matrix() {
         L(m + i, 1 + i) = 2 * c(i);
     }
 
-    std::cout << "L.rows(): " << L.rows() << std::endl;
-    std::cout << "L.cols(): " << L.cols() << std::endl;
-    std::cout << "m: " << m << std::endl; 
-    std::cout << "n: " << n << std::endl;
-    std::cout << "rmax: " << rmax << std::endl;
-    std::cout << "L matrix (first 10 rows, first 10 cols):" << std::endl;
-    for (int i = 0; i < min(10, (int)L.rows()); i++) {
-        for (int j = 0; j < min(10, (int)L.cols()); j++) {
-            std::cout << L(i,j) << " ";
-        }
-        std::cout << std::endl;
-}
+    // std::cout << "L.rows(): " << L.rows() << std::endl;
+    // std::cout << "L.cols(): " << L.cols() << std::endl;
+    // std::cout << "m: " << m << std::endl; 
+    // std::cout << "n: " << n << std::endl;
+    // std::cout << "rmax: " << rmax << std::endl;
+    // std::cout << "L matrix (first 10 rows, first 10 cols):" << std::endl;
+    // for (int i = 0; i < min(10, (int)L.rows()); i++) {
+    //     for (int j = 0; j < min(10, (int)L.cols()); j++) {
+    //         std::cout << L(i,j) << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
 }
 
 void MarketSplit::get_reduced_basis() {
@@ -222,29 +222,29 @@ void MarketSplit::get_reduced_basis() {
             fplll_mat[i][j] = L(j, i);
         }
     }
-    // Debug: Print original matrix
-    std::cout << "Before BKZ reduction:" << std::endl;
-    for (int i = 0; i < min(5, ext_n); i++) {
-        for (int j = 0; j < ext_m; j++) {
-            std::cout << fplll_mat[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << "..." << std::endl;
+    // // Debug: Print original matrix
+    // std::cout << "Before BKZ reduction:" << std::endl;
+    // for (int i = 0; i < min(5, ext_n); i++) {
+    //     for (int j = 0; j < ext_m; j++) {
+    //         std::cout << fplll_mat[i][j] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+    // std::cout << "..." << std::endl;
     
     // Apply BKZ reduction
     int block_size = min(30, ext_n / 2);
     int status = bkz_reduction(fplll_mat, block_size, BKZ_DEFAULT, FT_DEFAULT, 0);
 
-    // Debug: Print the matrix after BKZ
-    std::cout << "After BKZ reduction (" << ext_n << "x" << ext_m << "):" << std::endl;
-    for (int i = 0; i < min(10, ext_n); i++) {  // Print first 10 rows only
-        for (int j = 0; j < ext_m; j++) {
-            std::cout << fplll_mat[i][j] << " ";
-        }
-        std::cout << std::endl;
-    }
-    std::cout << "..." << std::endl;
+    // // Debug: Print the matrix after BKZ
+    // std::cout << "After BKZ reduction (" << ext_n << "x" << ext_m << "):" << std::endl;
+    // for (int i = 0; i < min(10, ext_n); i++) {  // Print first 10 rows only
+    //     for (int j = 0; j < ext_m; j++) {
+    //         std::cout << fplll_mat[i][j] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+    // std::cout << "..." << std::endl;
 
     // Extract null space basis
     vector<VectorXi> basis_vectors;
@@ -269,10 +269,10 @@ void MarketSplit::get_reduced_basis() {
     
     // Convert to matrix
     basis.resize(n_basis, n + 1);
-    std::cout << "n_basis: " << n_basis << std::endl;
-    std::cout << "basis_vectors.size(): " << basis_vectors.size() << std::endl;
-    std::cout << "basis.rows(): " << basis.rows() << std::endl;
-    std::cout << "basis.cols(): " << basis.cols() << std::endl;
+    // std::cout << "n_basis: " << n_basis << std::endl;
+    // std::cout << "basis_vectors.size(): " << basis_vectors.size() << std::endl;
+    // std::cout << "basis.rows(): " << basis.rows() << std::endl;
+    // std::cout << "basis.cols(): " << basis.cols() << std::endl;
     for (int i = 0; i < n_basis; i++) {
         basis.row(i) = basis_vectors[i];
     }
