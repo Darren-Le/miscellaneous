@@ -514,7 +514,7 @@ inline bool MarketSplit::backtrack(int idx, int* u_values, const double* prev_w_
             if (valid) {
                 VectorXi x(n);
                 for (int i = 0; i < n; i++) {
-                    x(i) = static_cast<int>(round((v_data[i] + rmax) / (2 * c(i))));
+                    x(i) = static_cast<int>(round((v_data[i] + rmax) / (2 * this->c(i))));
                 }
                 
                 if ((A * x - d).norm() < 1e-10) {
@@ -595,7 +595,7 @@ inline bool MarketSplit::backtrack(int idx, int* u_values, const double* prev_w_
             continue;
         }
         
-        if (backtrack_inline(idx - 1, u_values, curr_w_data, w_norm_sq, solutions, c, u_global_bounds_data)) {
+        if (backtrack(idx - 1, u_values, curr_w_data, w_norm_sq, solutions, c, u_global_bounds_data)) {
             return true;
         }
     }
