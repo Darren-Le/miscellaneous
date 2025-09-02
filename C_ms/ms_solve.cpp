@@ -363,31 +363,158 @@ bool MarketSplit::verify_dual(double tol) const {
     return true;
 }
 
-bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, 
-                           vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds) {
+// bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, 
+//                            vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds) {
+//     backtrack_loops++;
+    
+//     if (idx == -1) {
+//         dive_loops++;
+        
+//         VectorXd v = VectorXd::Zero(n + 1);
+//         for (int i = 0; i < n_basis; i++) {
+//             v += u_values[i] * basis.row(i).cast<double>();
+//         }
+        
+//         if (abs(v(n) - rmax) < 1e-10) {
+//             bool valid = true;
+//             for (int i = 0; i < n; i++) {
+//                 if (v(i) < -rmax - 1e-10 || v(i) > rmax + 1e-10) {
+//                     valid = false;
+//                     break;
+//                 }
+//             }
+            
+//             if (valid) {
+//                 VectorXi x(n);
+//                 for (int i = 0; i < n; i++) {
+//                     x(i) = static_cast<int>(round((v(i) + rmax) / (2 * this->c(i))));
+//                 }
+                
+//                 if ((A * x - d).norm() < 1e-10) {
+//                     if (first_solution_time == 0.0) {
+//                         auto current_time = high_resolution_clock::now();
+//                         first_solution_time = duration<double>(current_time - start_time).count();
+//                         first_sol_bt_loops = backtrack_loops;
+//                     }
+//                     solutions.push_back(x);
+//                     if (max_sols > 0 && static_cast<int>(solutions.size()) >= max_sols) {
+//                         return true;
+//                     }
+//                 }
+//             }
+//         }
+//         return false;
+//     }
+    
+//     // First pruning condition
+//     if (prev_w_norm_sq > c + 1e-10) {
+//         dive_loops++;
+//         first_pruning_effect_count++;
+//         return false;
+//     }
+    
+//     // Compute mu_sum
+//     double mu_sum = 0.0;
+//     for (int j = idx + 1; j < n_basis; j++) {
+//         mu_sum += u_values[j] * mu(j, idx);
+//     }
+    
+//     // First pruning bounds
+//     double bound_sq = (c - prev_w_norm_sq) / b_hat_norms_sq(idx);
+//     double bound = sqrt(max(0.0, bound_sq));
+    
+//     int u_min_pruning1 = static_cast<int>(floor(-bound - mu_sum));
+//     int u_max_pruning1 = static_cast<int>(ceil(bound - mu_sum));
+    
+//     // Second pruning bounds
+//     int u_min_pruning2 = static_cast<int>(floor(-u_global_bounds(idx)));
+//     int u_max_pruning2 = static_cast<int>(ceil(u_global_bounds(idx)));
+    
+//     int u_min = max(u_min_pruning1, u_min_pruning2);
+//     int u_max = min(u_max_pruning1, u_max_pruning2);
+    
+//     int original_range = u_max_pruning1 - u_min_pruning1 + 1;
+//     int final_range = max(0, u_max - u_min + 1);
+    
+//     if (final_range < original_range) {
+//         second_pruning_effect_count++;
+//     }
+    
+//     // Third pruning strategy
+//     for (int u_val = u_min; u_val <= u_max; u_val++) {
+//         u_values[idx] = u_val;
+        
+//         double coeff = u_val + mu_sum;
+//         VectorXd curr_w = coeff * b_hat.row(idx).transpose() + prev_w;
+        
+//         double w_norm_sq = coeff * coeff * b_hat_norms_sq(idx) + prev_w_norm_sq;
+//         double w_norm_l1 = curr_w.lpNorm<1>();
+        
+//         if (w_norm_sq > rmax * w_norm_l1 + 1e-10) {
+//             if (coeff > 0) {
+//                 third_pruning_effect_count += (u_max - u_val);
+//                 break;
+//             }
+//             third_pruning_effect_count++;
+//             continue;
+//         }
+        
+//         if (backtrack(idx - 1, u_values, curr_w, w_norm_sq, solutions, c, u_global_bounds)) {
+//             return true;
+//         }
+//     }
+    
+//     return false;
+// }
+
+// vector<VectorXi> MarketSplit::enumerate() {
+//     vector<VectorXi> solutions;
+//     double c = (n + 1) * rmax * rmax;
+    
+//     // Global bounds
+//     double sqrt_c = sqrt(c);
+//     VectorXd u_global_bounds(n_basis);
+//     for (int i = 0; i < n_basis; i++) {
+//         u_global_bounds(i) = min(b_bar_norms_l2(i) * sqrt_c, b_bar_norms_l1(i) * rmax);
+//     }
+    
+//     vector<int> u_values(n_basis, 0);
+//     VectorXd initial_w = VectorXd::Zero(n + 1);
+    
+//     backtrack(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
+    
+//     return solutions;
+// }
+
+inline bool MarketSplit::backtrack(int idx, int* u_values, const double* prev_w_data, 
+                                         double prev_w_norm_sq, vector<VectorXi>& solutions, 
+                                         double c, const double* u_global_bounds_data) {
     backtrack_loops++;
     
     if (idx == -1) {
         dive_loops++;
         
-        VectorXd v = VectorXd::Zero(n + 1);
-        for (int i = 0; i < n_basis; i++) {
-            v += u_values[i] * basis.row(i).cast<double>();
+        // Manual vector computation instead of Eigen
+        double v_data[MAX_N_PLUS_1];
+        for (int i = 0; i < n + 1; i++) {
+            v_data[i] = 0.0;
+            for (int j = 0; j < n_basis; j++) {
+                v_data[i] += u_values[j] * basis(j, i);
+            }
         }
         
-        if (abs(v(n) - rmax) < 1e-10) {
+        if (abs(v_data[n] - rmax) < 1e-10) {
             bool valid = true;
-            for (int i = 0; i < n; i++) {
-                if (v(i) < -rmax - 1e-10 || v(i) > rmax + 1e-10) {
+            for (int i = 0; i < n && valid; i++) {
+                if (v_data[i] < -rmax - 1e-10 || v_data[i] > rmax + 1e-10) {
                     valid = false;
-                    break;
                 }
             }
             
             if (valid) {
                 VectorXi x(n);
                 for (int i = 0; i < n; i++) {
-                    x(i) = static_cast<int>(round((v(i) + rmax) / (2 * this->c(i))));
+                    x(i) = static_cast<int>(round((v_data[i] + rmax) / (2 * c(i))));
                 }
                 
                 if ((A * x - d).norm() < 1e-10) {
@@ -413,22 +540,21 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
         return false;
     }
     
-    // Compute mu_sum
+    // Manual mu_sum calculation
     double mu_sum = 0.0;
     for (int j = idx + 1; j < n_basis; j++) {
         mu_sum += u_values[j] * mu(j, idx);
     }
     
-    // First pruning bounds
+    // Bounds calculations
     double bound_sq = (c - prev_w_norm_sq) / b_hat_norms_sq(idx);
     double bound = sqrt(max(0.0, bound_sq));
     
     int u_min_pruning1 = static_cast<int>(floor(-bound - mu_sum));
     int u_max_pruning1 = static_cast<int>(ceil(bound - mu_sum));
     
-    // Second pruning bounds
-    int u_min_pruning2 = static_cast<int>(floor(-u_global_bounds(idx)));
-    int u_max_pruning2 = static_cast<int>(ceil(u_global_bounds(idx)));
+    int u_min_pruning2 = static_cast<int>(floor(-u_global_bounds_data[idx]));
+    int u_max_pruning2 = static_cast<int>(ceil(u_global_bounds_data[idx]));
     
     int u_min = max(u_min_pruning1, u_min_pruning2);
     int u_max = min(u_max_pruning1, u_max_pruning2);
@@ -440,15 +566,25 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
         second_pruning_effect_count++;
     }
     
-    // Third pruning strategy
-    for (int u_val = u_min; u_val <= u_max; u_val++) {
+    // Pre-allocate current w buffer  
+    double curr_w_data[MAX_N_PLUS_1];
+    
+    // Optimized loop
+    const int range = u_max - u_min + 1;
+    for (int i = 0; i < range; i++) {
+        const int u_val = u_min + i;
         u_values[idx] = u_val;
         
-        double coeff = u_val + mu_sum;
-        VectorXd curr_w = coeff * b_hat.row(idx).transpose() + prev_w;
+        const double coeff = u_val + mu_sum;
         
+        // Manual vector operations instead of Eigen
         double w_norm_sq = coeff * coeff * b_hat_norms_sq(idx) + prev_w_norm_sq;
-        double w_norm_l1 = curr_w.lpNorm<1>();
+        double w_norm_l1 = 0.0;
+        
+        for (int j = 0; j < n + 1; j++) {
+            curr_w_data[j] = coeff * b_hat(idx, j) + prev_w_data[j];
+            w_norm_l1 += abs(curr_w_data[j]);
+        }
         
         if (w_norm_sq > rmax * w_norm_l1 + 1e-10) {
             if (coeff > 0) {
@@ -459,32 +595,13 @@ bool MarketSplit::backtrack(int idx, vector<int>& u_values, const VectorXd& prev
             continue;
         }
         
-        if (backtrack(idx - 1, u_values, curr_w, w_norm_sq, solutions, c, u_global_bounds)) {
+        if (backtrack_inline(idx - 1, u_values, curr_w_data, w_norm_sq, solutions, c, u_global_bounds_data)) {
             return true;
         }
     }
     
     return false;
 }
-
-// vector<VectorXi> MarketSplit::enumerate() {
-//     vector<VectorXi> solutions;
-//     double c = (n + 1) * rmax * rmax;
-    
-//     // Global bounds
-//     double sqrt_c = sqrt(c);
-//     VectorXd u_global_bounds(n_basis);
-//     for (int i = 0; i < n_basis; i++) {
-//         u_global_bounds(i) = min(b_bar_norms_l2(i) * sqrt_c, b_bar_norms_l1(i) * rmax);
-//     }
-    
-//     vector<int> u_values(n_basis, 0);
-//     VectorXd initial_w = VectorXd::Zero(n + 1);
-    
-//     backtrack(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
-    
-//     return solutions;
-// }
 
 vector<VectorXi> MarketSplit::enumerate() {
     vector<VectorXi> solutions;
@@ -511,7 +628,7 @@ vector<VectorXi> MarketSplit::enumerate() {
         initial_w[i] = 0.0;
     }
     
-    backtrack_inline(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
+    backtrack(n_basis - 1, u_values, initial_w, 0.0, solutions, c, u_global_bounds);
     
     return solutions;
 }

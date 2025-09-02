@@ -78,7 +78,8 @@ public:
     bool verify_gso(double tol = 1e-10) const;
     bool verify_dual(double tol = 1e-10) const;
 
-    inline bool backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds);
+    // bool backtrack(int idx, vector<int>& u_values, const VectorXd& prev_w, double prev_w_norm_sq, vector<VectorXi>& solutions, double c, const VectorXd& u_global_bounds);
+    inline bool backtrack(int idx, int* u_values_ptr, const double* prev_w_data, double prev_w_norm_sq, vector<VectorXi>& solutions, double c, const double* u_global_bounds_data);
 
     // Getters for statistics
     long long get_backtrack_loops() const { return backtrack_loops; }
